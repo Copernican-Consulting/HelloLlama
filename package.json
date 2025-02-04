@@ -11,6 +11,9 @@
   "license": "ISC",
   "dependencies": {
     "@electron/remote": "^2.1.2",
-    "electron": "^34.0.2"
+    "docx": "^9.1.1",
+    "electron": "^34.0.2",
+    "mammoth": "^1.9.0",
+    "pdf-parse": "^1.1.1"
   }
 }

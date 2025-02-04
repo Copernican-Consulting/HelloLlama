@@ -1,4 +1,7 @@
 const { ipcRenderer } = require('electron');
+const pdfParse = require('pdf-parse');
+const mammoth = require('mammoth');
+const fs = require('fs');
 
 const inputText = document.getElementById('inputText');
 const fileInput = document.getElementById('fileInput');
@@ -9,14 +12,40 @@ const output = document.getElementById('output');
 // Handle file upload
 fileInput.addEventListener('change', async (e) => {
     const file = e.target.files[0];
-    if (file) {
-        try {
-            const text = await file.text();
-            inputText.value = text;
-        } catch (error) {
-            console.error('Error reading file:', error);
-            output.textContent = 'Error reading file: ' + error.message;
+    if (!file) return;
+
+    try {
+        const fileExtension = file.name.split('.').pop().toLowerCase();
+        let text = '';
+
+        switch (fileExtension) {
+            case 'txt':
+                text = await file.text();
+                break;
+
+            case 'pdf':
+                const pdfBuffer = await file.arrayBuffer();
+                const pdfData = await pdfParse(Buffer.from(pdfBuffer));
+                text = pdfData.text;
+                break;
+
+            case 'doc':
+            case 'docx':
+                const docBuffer = await file.arrayBuffer();
+                const result = await mammoth.extractRawText({
+                    buffer: Buffer.from(docBuffer)
+                });
+                text = result.value;
+                break;
+
+            default:
+                throw new Error('Unsupported file type');
         }
+
+        inputText.value = text;
+    } catch (error) {
+        console.error('Error reading file:', error);
+        output.textContent = 'Error reading file: ' + error.message;
     }
 });
 

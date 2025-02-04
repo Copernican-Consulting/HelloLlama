@@ -11,7 +11,7 @@ A simple Electron application that interfaces with Ollama's llama3 model for tex
 
 1. Clone this repository:
 ```bash
-git clone https://github.com/yourusername/HelloLlama.git
+git clone https://github.com/Copernican-Consulting/HelloLlama.git
 cd HelloLlama
 ```
 
@@ -35,7 +35,7 @@ npm start
 ## Features
 
 - Direct text input through a text area
-- Text file upload support (.txt files)
+- File upload support for multiple formats (.txt, .pdf, .doc, .docx)
 - Real-time processing status
 - Clean, modern user interface
 - Error handling and user feedback

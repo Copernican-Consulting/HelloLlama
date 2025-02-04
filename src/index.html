@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Hello Llama</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Hello Llama</h1>
+        
+        <div class="input-section">
+            <textarea id="inputText" placeholder="Type your text here or upload a file..."></textarea>
+            
+            <div class="controls">
+                <input type="file" id="fileInput" accept=".txt">
+                <button id="submitBtn">Process Text</button>
+            </div>
+        </div>
+
+        <div class="output-section">
+            <div id="loading" class="loading hidden">Processing...</div>
+            <div id="output"></div>
+        </div>
+    </div>
+
+    <script src="renderer.js"></script>
+</body>
+</html>

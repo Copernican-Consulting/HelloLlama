@@ -6,20 +6,78 @@
 </head>
 <body>
     <div class="container">
-        <h1>Hello Llama</h1>
-        
-        <div class="input-section">
-            <textarea id="inputText" placeholder="Type your text here or upload a file..."></textarea>
-            
-            <div class="controls">
-                <input type="file" id="fileInput" accept=".txt,.pdf,.doc,.docx">
-                <button id="submitBtn">Process Text</button>
+        <header>
+            <h1>Hello Llama</h1>
+            <button id="settingsBtn" class="icon-button">⚙️</button>
+        </header>
+
+        <div id="mainView" class="view">
+            <div class="tabs-container">
+                <div class="tabs-header">
+                    <div class="tabs-list" id="tabsList">
+                        <button class="tab active" data-tab="tab1">Tab 1</button>
+                        <button class="new-tab" id="newTabBtn">+</button>
+                    </div>
+                </div>
+                
+                <div class="tabs-content">
+                    <div class="tab-panel active" id="tab1">
+                        <div class="split-pane">
+                            <div class="input-pane">
+                                <div class="input-section">
+                                    <textarea class="input-text" placeholder="Type your text here or upload a file..."></textarea>
+                                    
+                                    <div class="controls">
+                                        <input type="file" class="file-input" accept=".txt,.pdf,.doc,.docx">
+                                        <button class="submit-btn">Process Text</button>
+                                        <button class="clone-btn">Clone Tab</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="output-pane">
+                                <div class="loading hidden">Processing...</div>
+                                <div class="output"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <div class="output-section">
-            <div id="loading" class="loading hidden">Processing...</div>
-            <div id="output"></div>
+        <div id="settingsView" class="view hidden">
+            <h2>Settings</h2>
+            
+            <div class="settings-group">
+                <label for="modelSelect">Model:</label>
+                <select id="modelSelect"></select>
+            </div>
+
+            <div class="settings-group">
+                <label for="contextWindow">Max Context Window:</label>
+                <input type="number" id="contextWindow" min="0" value="4096">
+            </div>
+
+            <div class="settings-group">
+                <label for="timeout">Timeout (seconds):</label>
+                <input type="number" id="timeout" min="0" value="120">
+            </div>
+
+            <div class="settings-group">
+                <label for="stream">Stream Response:</label>
+                <input type="checkbox" id="stream" checked>
+            </div>
+
+            <div class="settings-group">
+                <label for="temperature">Temperature:</label>
+                <input type="range" id="temperature" min="0" max="1" step="0.01" value="0.75">
+                <span id="temperatureValue">0.75</span>
+            </div>
+
+            <div class="settings-group">
+                <label for="systemPrompt">System Prompt:</label>
+                <textarea id="systemPrompt" placeholder="Enter a system prompt to be applied to all submissions..."></textarea>
+            </div>
         </div>
     </div>
 

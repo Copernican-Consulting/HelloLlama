@@ -16,7 +16,11 @@ const timeout = document.getElementById('timeout');
 const stream = document.getElementById('stream');
 const temperature = document.getElementById('temperature');
 const temperatureValue = document.getElementById('temperatureValue');
+const seed = document.getElementById('seed');
 const systemPrompt = document.getElementById('systemPrompt');
+
+// Store raw LLM responses for debugging
+let rawResponses = {};
 
 // Add Save and Close button to Settings
 const saveCloseBtn = document.createElement('button');
@@ -44,6 +48,7 @@ settingsView.appendChild(saveCloseBtn);
 // Feedback state
 let currentText = '';
 let feedbackData = {};
+let debugMode = {};
 
 // Persona Management
 const PERSONAS = {
@@ -234,9 +239,14 @@ function setupSubmitHandlers() {
 
                     const response = await ipcRenderer.invoke('process-text', {
                         text,
-                        settings: currentSettings
+                        settings: {
+                            ...currentSettings,
+                            seed: seed?.value ? parseInt(seed.value) : undefined
+                        }
                     });
 
+                    // Store raw response for debugging
+                    rawResponses[persona] = response;
                     const parsedResponse = JSON.parse(response);
                     feedbackData[persona] = parsedResponse;
                     
@@ -260,7 +270,7 @@ function setupSubmitHandlers() {
     });
 }
 
-function createFeedbackDisplay(feedback, persona) {
+function createFeedbackDisplay(feedback, persona, rawResponse = null) {
     const panel = document.getElementById(persona);
     if (!panel) return;
 
@@ -278,6 +288,31 @@ function createFeedbackDisplay(feedback, persona) {
     inputView.classList.add('hidden');
     feedbackView.classList.remove('hidden');
 
+    // Setup debug button
+    const debugBtn = panel.querySelector('.debug-btn');
+    if (debugBtn) {
+        debugBtn.addEventListener('click', () => {
+            debugMode[persona] = !debugMode[persona];
+            debugBtn.textContent = debugMode[persona] ? 'Hide Debug Info' : 'Show Debug Info';
+            
+            // Toggle debug info display
+            const existingDebug = panel.querySelector('.debug-info');
+            if (debugMode[persona]) {
+                if (!existingDebug) {
+                    const debugInfo = document.createElement('div');
+                    debugInfo.className = 'debug-info';
+                    debugInfo.innerHTML = `
+                        <h3>Raw LLM Response:</h3>
+                        <pre>${rawResponses[persona] || 'No raw response available'}</pre>
+                    `;
+                    feedbackView.insertBefore(debugInfo, feedbackView.firstChild);
+                }
+            } else if (existingDebug) {
+                existingDebug.remove();
+            }
+        });
+    }
+
     // Display document with highlights
     documentContent.innerHTML = currentText;
     
@@ -293,15 +328,18 @@ function createFeedbackDisplay(feedback, persona) {
             .filter(item => item.index !== -1)
             .sort((a, b) => b.index - a.index);
 
-        let lastIndex = 0;
         let result = '';
         
+        // Create an array of all highlight positions
+        const highlights = [];
         sortedSnippets.forEach(({ snippet, comment, index }) => {
-            if (index < lastIndex) return;
-            
-            result += currentText.substring(lastIndex, index);
-            result += `<span class="highlight ${persona}" data-comment-id="${persona}-${index}">${snippet}</span>`;
-            lastIndex = index + snippet.length;
+            highlights.push({
+                start: index,
+                end: index + snippet.length,
+                snippet,
+                comment,
+                persona
+            });
 
             const commentEl = document.createElement('div');
             commentEl.className = `comment ${persona}`;
@@ -312,8 +350,30 @@ function createFeedbackDisplay(feedback, persona) {
             `;
             snippetCommentsContent.appendChild(commentEl);
         });
+
+        // Sort highlights by start position
+        highlights.sort((a, b) => a.start - b.start);
+
+        // Build the result text with all highlights
+        let currentPosition = 0;
         
-        result += currentText.substring(lastIndex);
+        highlights.forEach(highlight => {
+            // Add text before this highlight
+            if (highlight.start > currentPosition) {
+                result += currentText.substring(currentPosition, highlight.start);
+            }
+            
+            // Add the highlighted text
+            result += `<span class="highlight ${persona}" data-comment-id="${persona}-${highlight.start}">${highlight.snippet}</span>`;
+            
+            // Update currentPosition only if this highlight extends beyond previous ones
+            currentPosition = Math.max(currentPosition, highlight.end);
+        });
+        
+        // Add any remaining text
+        if (currentPosition < currentText.length) {
+            result += currentText.substring(currentPosition);
+        }
         documentContent.innerHTML = result;
     }
 
@@ -403,8 +463,39 @@ function updateAllFeedbackView() {
     const snippetCommentsContent = panel.querySelector('.snippet-comments-content');
     const generalCommentsContent = panel.querySelector('.general-comments-content');
     const scoresContent = panel.querySelector('.scores-content');
+    const debugBtn = panel.querySelector('.debug-btn');
 
     if (!documentContent || !snippetCommentsContent || !generalCommentsContent || !scoresContent) return;
+
+    // Setup debug button for all tab
+    if (debugBtn) {
+        debugBtn.addEventListener('click', () => {
+            debugMode.all = !debugMode.all;
+            debugBtn.textContent = debugMode.all ? 'Hide Debug Info' : 'Show Debug Info';
+            
+            const existingDebug = panel.querySelector('.debug-info');
+            if (debugMode.all) {
+                if (!existingDebug) {
+                    const debugInfo = document.createElement('div');
+                    debugInfo.className = 'debug-info';
+                    let debugContent = '<h3>Raw LLM Responses:</h3>';
+                    
+                    // Add responses from all personas
+                    Object.entries(rawResponses).forEach(([persona, response]) => {
+                        debugContent += `
+                            <h4>${PERSONAS[persona]}:</h4>
+                            <pre>${response || 'No response available'}</pre>
+                        `;
+                    });
+                    
+                    debugInfo.innerHTML = debugContent;
+                    panel.querySelector('.feedback-view').insertBefore(debugInfo, panel.querySelector('.all-feedback-container'));
+                }
+            } else if (existingDebug) {
+                existingDebug.remove();
+            }
+        });
+    }
 
     documentContent.innerHTML = currentText;
     snippetCommentsContent.innerHTML = '';
@@ -780,7 +871,8 @@ const defaultSettings = {
     contextWindow: 4096,
     timeout: 120,
     stream: true,
-    temperature: 0.75
+    temperature: 0.75,
+    seed: ''
 };
 
 function loadSettings() {
@@ -794,7 +886,8 @@ function saveSettings() {
         contextWindow: parseInt(contextWindow.value),
         timeout: parseInt(timeout.value),
         stream: stream.checked,
-        temperature: parseFloat(temperature.value)
+        temperature: parseFloat(temperature.value),
+        seed: seed.value
     };
     localStorage.setItem('settings', JSON.stringify(settings));
 }
@@ -807,6 +900,7 @@ function applySettings(settings) {
     if (stream) stream.checked = settings.stream;
     if (temperature) temperature.value = settings.temperature;
     if (temperatureValue) temperatureValue.textContent = settings.temperature;
+    if (seed && settings.seed) seed.value = settings.seed;
 }
 
 // View switching

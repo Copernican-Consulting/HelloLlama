@@ -306,16 +306,39 @@ h2 {
     border-radius: 2px;
     cursor: pointer;
     transition: opacity 0.2s ease;
+    border: 1px solid transparent;
+    position: relative;
+    z-index: 1;
 }
 
-.highlight.management { background-color: color-mix(in srgb, var(--management-color) 25%, transparent); }
-.highlight.technical { background-color: color-mix(in srgb, var(--technical-color) 25%, transparent); }
-.highlight.hr { background-color: color-mix(in srgb, var(--hr-color) 25%, transparent); }
-.highlight.legal { background-color: color-mix(in srgb, var(--legal-color) 25%, transparent); }
-.highlight.junior { background-color: color-mix(in srgb, var(--junior-color) 25%, transparent); }
+.highlight:hover {
+    z-index: 2;
+}
+
+.highlight.management { 
+    background-color: color-mix(in srgb, var(--management-color) 15%, transparent);
+    border-color: color-mix(in srgb, var(--management-color) 50%, transparent);
+}
+.highlight.technical { 
+    background-color: color-mix(in srgb, var(--technical-color) 15%, transparent);
+    border-color: color-mix(in srgb, var(--technical-color) 50%, transparent);
+}
+.highlight.hr { 
+    background-color: color-mix(in srgb, var(--hr-color) 15%, transparent);
+    border-color: color-mix(in srgb, var(--hr-color) 50%, transparent);
+}
+.highlight.legal { 
+    background-color: color-mix(in srgb, var(--legal-color) 15%, transparent);
+    border-color: color-mix(in srgb, var(--legal-color) 50%, transparent);
+}
+.highlight.junior { 
+    background-color: color-mix(in srgb, var(--junior-color) 15%, transparent);
+    border-color: color-mix(in srgb, var(--junior-color) 50%, transparent);
+}
 
 .highlight.active {
     outline: 2px solid currentColor;
+    z-index: 3;
 }
 
 /* Comment Styles */
@@ -398,6 +421,56 @@ h2 {
 .progress-item.hr { border-color: var(--hr-color); }
 .progress-item.legal { border-color: var(--legal-color); }
 .progress-item.junior { border-color: var(--junior-color); }
+
+/* Debug Info */
+.feedback-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 20px;
+    background: #f9f9f9;
+    padding: 15px;
+    border-radius: 4px;
+}
+
+.feedback-header .feedback-scores {
+    flex: 1;
+    padding: 0;
+    background: none;
+}
+
+.debug-btn {
+    padding: 8px 16px;
+    background: #666;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: background-color 0.2s;
+}
+
+.debug-btn:hover {
+    background: #555;
+}
+
+.debug-info {
+    background: #f0f0f0;
+    padding: 15px;
+    margin-bottom: 15px;
+    border-radius: 4px;
+    border-left: 4px solid #666;
+}
+
+.debug-info pre {
+    background: white;
+    padding: 10px;
+    border-radius: 4px;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.4;
+    margin: 10px 0 0;
+}
 
 /* Settings */
 .settings-group {

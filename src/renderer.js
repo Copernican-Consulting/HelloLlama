@@ -363,14 +363,60 @@ function createFeedbackDisplay(feedback, persona, rawResponse = null) {
                 verticalOffset
             });
 
+            // Create a temporary container to measure text height
+            const tempContainer = document.createElement('div');
+            tempContainer.style.cssText = `
+                position: absolute;
+                visibility: hidden;
+                width: ${documentContent.clientWidth}px;
+                white-space: pre-wrap;
+                line-height: 1.6;
+                padding: 20px;
+                font-family: inherit;
+                font-size: inherit;
+            `;
+            documentContent.appendChild(tempContainer);
+            
+            // Calculate the highlight's position
+            const textBefore = currentText.substring(0, index);
+            tempContainer.textContent = textBefore;
+            const highlightTop = tempContainer.offsetHeight;
+            
+            // Get the total height of the document
+            tempContainer.textContent = currentText;
+            const documentHeight = tempContainer.offsetHeight;
+            
+            // Calculate percentage position
+            const highlightPosition = (highlightTop / documentHeight) * 100;
+            
+            // Clean up
+            tempContainer.remove();
+            
+            // Create and position the comment
             const commentEl = document.createElement('div');
             commentEl.className = `comment ${persona}`;
             commentEl.setAttribute('data-highlight-id', `${persona}-${index}`);
-            commentEl.setAttribute('data-offset', verticalOffset);
-            commentEl.style.top = `${verticalOffset}px`;
+            
+            // Track the last comment's position
+            const lastComment = snippetCommentsContent.lastElementChild;
+            let topPosition = `${highlightPosition}%`;
+            
+            if (lastComment) {
+                const lastRect = lastComment.getBoundingClientRect();
+                const containerRect = snippetCommentsContent.getBoundingClientRect();
+                const lastBottom = lastRect.bottom - containerRect.top;
+                const newTop = (highlightPosition / 100) * containerRect.height;
+                
+                // If this comment would overlap with the previous one, position it below
+                if (newTop < lastBottom + 15) {
+                    topPosition = `${lastBottom + 15}px`;
+                }
+            }
+            
+            commentEl.style.top = topPosition;
             commentEl.innerHTML = `
                 <div class="comment-text">${comment}</div>
-                <div class="snippet-preview">"${snippet}"</div>
+                <div class="snippet-preview">Referenced text: "${snippet}"</div>
             `;
             snippetCommentsContent.appendChild(commentEl);
         });

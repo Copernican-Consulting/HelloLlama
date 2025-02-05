@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
+const fetch = require('node-fetch');
 require('@electron/remote/main').initialize();
 
 function createWindow() {
@@ -67,44 +68,53 @@ ipcMain.handle('process-text', async (event, { text, settings }) => {
             })
         });
 
-        if (settings.stream) {
-            // For streaming responses, we'll send chunks back to the renderer
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            let fullResponse = '';
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                let chunk = decoder.decode(value);
-                
-                // Handle partial chunks by buffering
-                chunk = chunk.replace(/}\s*{/g, '}\n{');  // Ensure proper line separation
-                const lines = chunk.split('\n');
-                
-                for (const line of lines) {
-                    const trimmedLine = line.trim();
-                    if (!trimmedLine) continue;
-                    
-                    try {
-                        // Extract response text using regex to avoid JSON parse errors
-                        const match = trimmedLine.match(/"response"\s*:\s*"([^"]*)"[,}]/);
-                        if (match && match[1]) {
-                            const response = match[1].replace(/\\n/g, '\n').replace(/\\/g, '');
-                            fullResponse += response;
-                            event.sender.send('stream-response', response);
-                        }
-                    } catch (error) {
-                        console.error('Error processing chunk:', error);
-                        continue;
-                    }
+        const data = await response.json();
+        
+        // Validate JSON structure
+        try {
+            const parsedResponse = JSON.parse(data.response);
+            
+            // Validate required fields and data types
+            if (!parsedResponse.scores || typeof parsedResponse.scores !== 'object') {
+                throw new Error('Missing or invalid scores object');
+            }
+            
+            const requiredScores = ['clarity', 'tone', 'alignment', 'efficiency', 'completeness'];
+            for (const score of requiredScores) {
+                if (typeof parsedResponse.scores[score] !== 'number' || 
+                    parsedResponse.scores[score] < 0 || 
+                    parsedResponse.scores[score] > 100) {
+                    throw new Error(`Invalid score for ${score}. Must be a number between 0 and 100`);
                 }
             }
-            return fullResponse;
-        } else {
-            const data = await response.json();
-            return data.response;
+            
+            if (!Array.isArray(parsedResponse.snippetFeedback)) {
+                throw new Error('snippetFeedback must be an array');
+            }
+            
+            parsedResponse.snippetFeedback.forEach((feedback, index) => {
+                if (!feedback.snippet || typeof feedback.snippet !== 'string') {
+                    throw new Error(`Invalid snippet at index ${index}`);
+                }
+                if (!feedback.comment || typeof feedback.comment !== 'string') {
+                    throw new Error(`Invalid comment at index ${index}`);
+                }
+            });
+            
+            if (!Array.isArray(parsedResponse.generalComments)) {
+                throw new Error('generalComments must be an array');
+            }
+            
+            parsedResponse.generalComments.forEach((comment, index) => {
+                if (typeof comment !== 'string') {
+                    throw new Error(`Invalid general comment at index ${index}`);
+                }
+            });
+            
+            return data.response; // Return the original JSON string for parsing in renderer
+        } catch (parseError) {
+            console.error('Invalid response format:', parseError);
+            throw new Error(`The model response was not in the correct format: ${parseError.message}`);
         }
     } catch (error) {
         console.error('Error:', error);

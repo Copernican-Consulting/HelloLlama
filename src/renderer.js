@@ -5,10 +5,11 @@ const fs = require('fs');
 
 // DOM Elements
 const settingsBtn = document.getElementById('settingsBtn');
+const viewAllFeedbackBtn = document.getElementById('viewAllFeedbackBtn');
 const mainView = document.getElementById('mainView');
 const settingsView = document.getElementById('settingsView');
+const allFeedbackView = document.getElementById('allFeedbackView');
 const tabsList = document.getElementById('tabsList');
-const newTabBtn = document.getElementById('newTabBtn');
 const modelSelect = document.getElementById('modelSelect');
 const contextWindow = document.getElementById('contextWindow');
 const timeout = document.getElementById('timeout');
@@ -17,55 +18,78 @@ const temperature = document.getElementById('temperature');
 const temperatureValue = document.getElementById('temperatureValue');
 const systemPrompt = document.getElementById('systemPrompt');
 
-// Tab Management
-let tabCounter = 1;
-let activeTabId = 'tab1';
+// Add Save and Close button to Settings
+const saveCloseBtn = document.createElement('button');
+saveCloseBtn.textContent = 'Save and Close';
+saveCloseBtn.style.cssText = `
+    padding: 10px 20px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    margin-top: 20px;
+    display: block;
+    width: 100%;
+`;
+saveCloseBtn.addEventListener('mouseover', () => {
+    saveCloseBtn.style.backgroundColor = '#45a049';
+});
+saveCloseBtn.addEventListener('mouseout', () => {
+    saveCloseBtn.style.backgroundColor = '#4CAF50';
+});
+settingsView.appendChild(saveCloseBtn);
 
-function createTabPanel(id, cloneContent = '') {
-    const panel = document.createElement('div');
-    panel.className = 'tab-panel';
-    panel.id = id;
-    panel.innerHTML = `
-        <div class="split-pane">
-            <div class="input-pane">
-                <div class="input-section">
-                    <textarea class="input-text" placeholder="Type your text here or upload a file...">${cloneContent}</textarea>
-                    <div class="controls">
-                        <input type="file" class="file-input" accept=".txt,.pdf,.doc,.docx">
-                        <button class="submit-btn">Process Text</button>
-                        <button class="clone-btn">Clone Tab</button>
-                    </div>
-                </div>
-            </div>
-            <div class="output-pane">
-                <div class="loading hidden">Processing...</div>
-                <div class="output"></div>
-            </div>
-        </div>
-    `;
-    return panel;
+// Feedback state
+let currentText = '';
+let feedbackData = {};
+
+// Persona Management
+const PERSONAS = {
+    management: 'Senior Management',
+    technical: 'Technical Project Manager',
+    hr: 'HR',
+    legal: 'Legal',
+    junior: 'New Junior Team Member'
+};
+
+let activeTabId = 'documents';
+
+function getDefaultPrompt(persona) {
+    return `You are a ${PERSONAS[persona]}. Analyze the following document and respond ONLY with a JSON object in this exact format:
+
+{
+    "scores": {
+        "clarity": 85,
+        "tone": 90,
+        "alignment": 75,
+        "efficiency": 80,
+        "completeness": 95
+    },
+    "snippetFeedback": [
+        {
+            "snippet": "paste the exact text you're commenting on here",
+            "comment": "your specific feedback about this text"
+        }
+    ],
+    "generalComments": [
+        "Your first general comment about the document",
+        "Your second general comment if needed"
+    ]
 }
 
-function addTab(cloneContent = '') {
-    tabCounter++;
-    const tabId = `tab${tabCounter}`;
-    
-    // Create and add tab button
-    const tabButton = document.createElement('button');
-    tabButton.className = 'tab';
-    tabButton.textContent = `Tab ${tabCounter}`;
-    tabButton.dataset.tab = tabId;
-    tabsList.insertBefore(tabButton, newTabBtn);
-    
-    // Create and add tab panel
-    const tabPanel = createTabPanel(tabId, cloneContent);
-    document.querySelector('.tabs-content').appendChild(tabPanel);
-    
-    // Setup event listeners for the new tab
-    setupTabEventListeners(tabId);
-    
-    // Switch to the new tab
-    switchTab(tabId);
+Important rules:
+1. Your entire response must be valid JSON - do not include any text before or after the JSON
+2. All scores must be numbers between 0 and 100
+3. snippetFeedback must contain exact quotes from the document
+4. Do not use line breaks within comment strings
+5. Escape any quotes within strings
+6. Keep snippet selections focused and specific
+7. Provide 2-4 general comments
+8. Include 2-5 snippet feedback items
+
+Remember: Respond ONLY with the JSON object - no other text.`;
 }
 
 function switchTab(tabId) {
@@ -77,127 +101,678 @@ function switchTab(tabId) {
         panel.classList.toggle('active', panel.id === tabId);
     });
     activeTabId = tabId;
+
+    // Hide document controls in non-document tabs
+    document.querySelectorAll('.document-controls').forEach(controls => {
+        if (controls.closest('#documents')) {
+            controls.style.display = 'flex';
+        } else {
+            controls.style.display = 'none';
+        }
+    });
+
+    // If switching to a persona tab, refresh its feedback display
+    if (PERSONAS[tabId] && feedbackData[tabId]) {
+        createFeedbackDisplay(feedbackData[tabId], tabId);
+    }
 }
 
-function setupTabEventListeners(tabId) {
-    const panel = document.getElementById(tabId);
-    const input = panel.querySelector('.input-text');
-    const fileInput = panel.querySelector('.file-input');
-    const submitBtn = panel.querySelector('.submit-btn');
-    const cloneBtn = panel.querySelector('.clone-btn');
-    const loading = panel.querySelector('.loading');
-    const output = panel.querySelector('.output');
+// File upload handler
+function setupFileUploadHandlers() {
+    document.querySelectorAll('.file-input').forEach(fileInput => {
+        fileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
 
-    // File upload handler
-    fileInput.addEventListener('change', async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
+            const panel = fileInput.closest('.tab-panel');
+            const input = panel.querySelector('.input-text');
 
-        try {
-            const fileExtension = file.name.split('.').pop().toLowerCase();
-            let text = '';
+            try {
+                const fileExtension = file.name.split('.').pop().toLowerCase();
+                let text = '';
 
-            switch (fileExtension) {
-                case 'txt':
-                    text = await file.text();
-                    break;
+                switch (fileExtension) {
+                    case 'txt':
+                        text = await new Promise((resolve, reject) => {
+                            const reader = new FileReader();
+                            reader.onload = (e) => resolve(e.target.result);
+                            reader.onerror = (e) => reject(new Error('Failed to read text file'));
+                            reader.readAsText(file);
+                        });
+                        break;
 
-                case 'pdf':
-                    const pdfBuffer = await file.arrayBuffer();
-                    const pdfData = await pdfParse(Buffer.from(pdfBuffer));
-                    text = pdfData.text;
-                    break;
+                    case 'pdf':
+                        const pdfBuffer = await new Promise((resolve, reject) => {
+                            const reader = new FileReader();
+                            reader.onload = (e) => resolve(e.target.result);
+                            reader.onerror = (e) => reject(new Error('Failed to read PDF file'));
+                            reader.readAsArrayBuffer(file);
+                        });
+                        const pdfData = await pdfParse(Buffer.from(pdfBuffer));
+                        text = pdfData.text;
+                        break;
 
-                case 'doc':
-                case 'docx':
-                    const docBuffer = await file.arrayBuffer();
-                    const result = await mammoth.extractRawText({
-                        buffer: Buffer.from(docBuffer)
+                    case 'doc':
+                    case 'docx':
+                        const docBuffer = await new Promise((resolve, reject) => {
+                            const reader = new FileReader();
+                            reader.onload = (e) => resolve(e.target.result);
+                            reader.onerror = (e) => reject(new Error('Failed to read Word document'));
+                            reader.readAsArrayBuffer(file);
+                        });
+                        const result = await mammoth.extractRawText({
+                            buffer: Buffer.from(docBuffer)
+                        });
+                        text = result.value;
+                        break;
+
+                    default:
+                        throw new Error('Unsupported file type');
+                }
+
+                // Set the text in all panels
+                document.querySelectorAll('.input-text').forEach(textArea => {
+                    textArea.value = text;
+                });
+                
+                // Reset progress when text changes
+                resetProgress();
+            } catch (error) {
+                console.error('Error reading file:', error);
+                showError(panel, 'Error reading file: ' + error.message);
+            }
+        });
+    });
+}
+
+// Submit handler
+function setupSubmitHandlers() {
+    document.querySelectorAll('.submit-btn').forEach(submitBtn => {
+        submitBtn.addEventListener('click', async () => {
+            const panel = submitBtn.closest('.tab-panel');
+            const text = panel.querySelector('.input-text').value.trim();
+            if (!text) {
+                showError(document.getElementById('documents'), 'Please enter some text or upload a file.');
+                return;
+            }
+
+            currentText = text;
+            feedbackData = {};
+            resetProgress();
+
+            // Process text for all personas
+            for (const persona of Object.keys(PERSONAS)) {
+                const personaPanel = document.getElementById(persona);
+                if (!personaPanel) continue;
+
+                const personaLoading = personaPanel.querySelector('.loading');
+                const inputView = personaPanel.querySelector('.input-view');
+                const feedbackView = personaPanel.querySelector('.feedback-view');
+
+                if (!personaLoading || !inputView || !feedbackView) continue;
+
+                try {
+                    personaLoading.classList.remove('hidden');
+                    inputView.classList.add('hidden');
+                    feedbackView.classList.add('hidden');
+
+                    const currentSettings = {
+                        model: modelSelect.value,
+                        contextWindow: parseInt(contextWindow.value),
+                        timeout: parseInt(timeout.value),
+                        stream: false,
+                        temperature: parseFloat(temperature.value),
+                        systemPrompt: document.getElementById(`${persona}Prompt`)?.value || getDefaultPrompt(persona),
+                        persona: persona
+                    };
+
+                    // Update progress indicator
+                    const progressItem = document.querySelector(`.progress-item.${persona}`);
+                    if (progressItem) {
+                        progressItem.textContent = `${PERSONAS[persona]} Feedback (Processing...)`;
+                    }
+
+                    const response = await ipcRenderer.invoke('process-text', {
+                        text,
+                        settings: currentSettings
                     });
-                    text = result.value;
-                    break;
 
-                default:
-                    throw new Error('Unsupported file type');
+                    const parsedResponse = JSON.parse(response);
+                    feedbackData[persona] = parsedResponse;
+                    
+                    // Update feedback display
+                    createFeedbackDisplay(parsedResponse, persona);
+                    
+                    // Update progress and enable tab
+                    markPersonaComplete(persona);
+                } catch (error) {
+                    console.error('Error processing text:', error);
+                    showError(personaPanel, 'Error processing text: ' + error.message);
+                } finally {
+                    personaLoading.classList.add('hidden');
+                    inputView.classList.remove('hidden');
+                }
             }
 
-            input.value = text;
-        } catch (error) {
-            console.error('Error reading file:', error);
-            output.textContent = 'Error reading file: ' + error.message;
-        }
-    });
-
-    // Submit handler
-    submitBtn.addEventListener('click', async () => {
-        const text = input.value.trim();
-        if (!text) {
-            output.textContent = 'Please enter some text or upload a file.';
-            return;
-        }
-
-        try {
-            loading.classList.remove('hidden');
-            output.textContent = '';
-            
-            const currentSettings = {
-                model: modelSelect.value,
-                contextWindow: parseInt(contextWindow.value),
-                timeout: parseInt(timeout.value),
-                stream: stream.checked,
-                temperature: parseFloat(temperature.value),
-                systemPrompt: systemPrompt.value
-            };
-            
-            if (currentSettings.stream) {
-                output.textContent = '';
-            }
-            
-            const response = await ipcRenderer.invoke('process-text', {
-                text,
-                settings: currentSettings
-            });
-
-            if (!currentSettings.stream) {
-                output.textContent = response;
-            }
-        } catch (error) {
-            console.error('Error processing text:', error);
-            output.textContent = 'Error processing text: ' + error.message;
-        } finally {
-            loading.classList.add('hidden');
-        }
-    });
-
-    // Clone handler
-    cloneBtn.addEventListener('click', () => {
-        addTab(input.value);
+            // Update all feedback view
+            updateAllFeedbackView();
+        });
     });
 }
 
-// Initialize first tab
-setupTabEventListeners('tab1');
+function createFeedbackDisplay(feedback, persona) {
+    const panel = document.getElementById(persona);
+    if (!panel) return;
+
+    const inputView = panel.querySelector('.input-view');
+    const feedbackView = panel.querySelector('.feedback-view');
+    const documentContent = panel.querySelector('.document-content');
+    const snippetCommentsContent = panel.querySelector('.snippet-comments-content');
+    const scoresContent = panel.querySelector('.scores-content');
+    const generalCommentsContent = panel.querySelector('.general-comments-content');
+
+    if (!inputView || !feedbackView || !documentContent || !snippetCommentsContent || 
+        !scoresContent || !generalCommentsContent) return;
+
+    // Hide input view and show feedback view
+    inputView.classList.add('hidden');
+    feedbackView.classList.remove('hidden');
+
+    // Display document with highlights
+    documentContent.innerHTML = currentText;
+    
+    // Add snippet comments
+    snippetCommentsContent.innerHTML = '';
+    if (feedback.snippetFeedback) {
+        const sortedSnippets = feedback.snippetFeedback
+            .map(({ snippet, comment }) => ({
+                snippet,
+                comment,
+                index: currentText.indexOf(snippet)
+            }))
+            .filter(item => item.index !== -1)
+            .sort((a, b) => b.index - a.index);
+
+        let lastIndex = 0;
+        let result = '';
+        
+        sortedSnippets.forEach(({ snippet, comment, index }) => {
+            if (index < lastIndex) return;
+            
+            result += currentText.substring(lastIndex, index);
+            result += `<span class="highlight ${persona}" data-comment-id="${persona}-${index}">${snippet}</span>`;
+            lastIndex = index + snippet.length;
+
+            const commentEl = document.createElement('div');
+            commentEl.className = `comment ${persona}`;
+            commentEl.setAttribute('data-highlight-id', `${persona}-${index}`);
+            commentEl.innerHTML = `
+                <div class="comment-text">${comment}</div>
+                <div class="snippet-preview">"${snippet}"</div>
+            `;
+            snippetCommentsContent.appendChild(commentEl);
+        });
+        
+        result += currentText.substring(lastIndex);
+        documentContent.innerHTML = result;
+    }
+
+    // Add score bars
+    scoresContent.innerHTML = '';
+    for (const [criterion, score] of Object.entries(feedback.scores)) {
+        const scoreClass = score < 70 ? 'low' : score < 85 ? 'medium' : 'high';
+        scoresContent.innerHTML += `
+            <div class="score-bar">
+                <div class="score-label">
+                    <span>${criterion.charAt(0).toUpperCase() + criterion.slice(1)}</span>
+                    <span>${score}/100</span>
+                </div>
+                <div class="score-progress">
+                    <div class="score-fill ${scoreClass}" style="width: ${score}%"></div>
+                </div>
+            </div>
+        `;
+    }
+
+    // Add general comments
+    generalCommentsContent.innerHTML = '';
+    if (feedback.generalComments) {
+        feedback.generalComments.forEach(comment => {
+            const commentEl = document.createElement('div');
+            commentEl.className = `comment ${persona}`;
+            commentEl.textContent = comment;
+            generalCommentsContent.appendChild(commentEl);
+        });
+    }
+
+    // Setup interactions
+    setupFeedbackInteractions(panel, persona);
+}
+
+function setupFeedbackInteractions(panel, persona) {
+    // Highlight interactions
+    panel.querySelectorAll('.highlight').forEach(highlight => {
+        highlight.addEventListener('click', () => {
+            const commentId = highlight.dataset.commentId;
+            const comment = panel.querySelector(`.comment[data-highlight-id="${commentId}"]`);
+            
+            panel.querySelectorAll('.highlight.active, .comment.active').forEach(el => {
+                el.classList.remove('active');
+                el.removeAttribute('data-linked');
+            });
+            
+            highlight.classList.add('active');
+            highlight.setAttribute('data-linked', 'true');
+            if (comment) {
+                comment.classList.add('active');
+                comment.setAttribute('data-linked', 'true');
+                comment.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        });
+    });
+
+    // Comment interactions
+    panel.querySelectorAll('.comment').forEach(comment => {
+        if (!comment.dataset.highlightId) return;
+        
+        comment.addEventListener('click', () => {
+            const highlightId = comment.dataset.highlightId;
+            const highlight = panel.querySelector(`.highlight[data-comment-id="${highlightId}"]`);
+            
+            panel.querySelectorAll('.highlight.active, .comment.active').forEach(el => {
+                el.classList.remove('active');
+                el.removeAttribute('data-linked');
+            });
+            
+            comment.classList.add('active');
+            comment.setAttribute('data-linked', 'true');
+            if (highlight) {
+                highlight.classList.add('active');
+                highlight.setAttribute('data-linked', 'true');
+                highlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        });
+    });
+}
+
+function updateAllFeedbackView() {
+    const panel = document.getElementById('all');
+    if (!panel) return;
+
+    const documentContent = panel.querySelector('.document-content');
+    const snippetCommentsContent = panel.querySelector('.snippet-comments-content');
+    const generalCommentsContent = panel.querySelector('.general-comments-content');
+    const scoresContent = panel.querySelector('.scores-content');
+
+    if (!documentContent || !snippetCommentsContent || !generalCommentsContent || !scoresContent) return;
+
+    documentContent.innerHTML = currentText;
+    snippetCommentsContent.innerHTML = '';
+    generalCommentsContent.innerHTML = '';
+    scoresContent.innerHTML = '';
+
+    if (!currentText) return;
+
+    // Calculate average scores
+    const averageScores = {};
+    let personaCount = 0;
+    
+    for (const feedback of Object.values(feedbackData)) {
+        if (!feedback.scores) continue;
+        personaCount++;
+        
+        for (const [criterion, score] of Object.entries(feedback.scores)) {
+            if (!averageScores[criterion]) {
+                averageScores[criterion] = 0;
+            }
+            averageScores[criterion] += score;
+        }
+    }
+
+    if (personaCount > 0) {
+        for (const [criterion, totalScore] of Object.entries(averageScores)) {
+            const averageScore = Math.round(totalScore / personaCount);
+            const scoreClass = averageScore < 70 ? 'low' : averageScore < 85 ? 'medium' : 'high';
+            
+            scoresContent.innerHTML += `
+                <div class="score-bar">
+                    <div class="score-label">
+                        <span>${criterion.charAt(0).toUpperCase() + criterion.slice(1)}</span>
+                        <span>${averageScore}/100</span>
+                    </div>
+                    <div class="score-progress">
+                        <div class="score-fill ${scoreClass}" style="width: ${averageScore}%"></div>
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    // Create text with highlights
+    let result = currentText;
+    const comments = [];
+
+    for (const [persona, feedback] of Object.entries(feedbackData)) {
+        if (!feedback.snippetFeedback) continue;
+
+        const sortedSnippets = feedback.snippetFeedback
+            .map(({ snippet, comment }) => ({
+                snippet,
+                comment,
+                index: currentText.indexOf(snippet)
+            }))
+            .filter(item => item.index !== -1)
+            .sort((a, b) => b.index - a.index);
+
+        sortedSnippets.forEach(({ snippet, comment, index }) => {
+            const before = result.substring(0, index);
+            const after = result.substring(index + snippet.length);
+            result = `${before}<span class="highlight ${persona}" data-comment-id="${persona}-${index}">${snippet}</span>${after}`;
+
+            comments.push({
+                persona,
+                comment,
+                snippet,
+                index
+            });
+        });
+    }
+
+    documentContent.innerHTML = result;
+
+    comments.sort((a, b) => a.index - b.index).forEach(({ persona, comment, snippet, index }) => {
+        const commentEl = document.createElement('div');
+        commentEl.className = `comment ${persona}`;
+        commentEl.setAttribute('data-highlight-id', `${persona}-${index}`);
+        commentEl.innerHTML = `
+            <div class="comment-text">${comment}</div>
+            <div class="snippet-preview">"${snippet}"</div>
+        `;
+        snippetCommentsContent.appendChild(commentEl);
+    });
+
+    setupAllFeedbackInteractions();
+
+    Object.entries(feedbackData).forEach(([persona, feedback]) => {
+        if (feedback.generalComments) {
+            feedback.generalComments.forEach(comment => {
+                const commentEl = document.createElement('div');
+                commentEl.className = `comment ${persona}`;
+                commentEl.textContent = comment;
+                generalCommentsContent.appendChild(commentEl);
+            });
+        }
+    });
+
+    // Restore filter states
+    document.querySelectorAll('.persona-filters input[type="checkbox"]').forEach(checkbox => {
+        const persona = checkbox.dataset.persona;
+        const isVisible = checkbox.checked;
+        
+        document.querySelectorAll(`.highlight.${persona}`).forEach(el => {
+            el.style.opacity = isVisible ? '1' : '0';
+            el.style.pointerEvents = isVisible ? 'auto' : 'none';
+        });
+        
+        document.querySelectorAll(`.comment.${persona}`).forEach(el => {
+            el.style.display = isVisible ? '' : 'none';
+        });
+    });
+}
+
+function setupAllFeedbackInteractions() {
+    document.querySelectorAll('.document-content .highlight').forEach(highlight => {
+        highlight.addEventListener('click', () => {
+            const commentId = highlight.dataset.commentId;
+            const comment = document.querySelector(`.comment[data-highlight-id="${commentId}"]`);
+            
+            document.querySelectorAll('.highlight.active, .comment.active').forEach(el => {
+                el.classList.remove('active');
+                el.removeAttribute('data-linked');
+            });
+            
+            highlight.classList.add('active');
+            highlight.setAttribute('data-linked', 'true');
+            if (comment) {
+                comment.classList.add('active');
+                comment.setAttribute('data-linked', 'true');
+                comment.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        });
+    });
+
+    document.querySelectorAll('.snippet-comments-content .comment').forEach(comment => {
+        comment.addEventListener('click', () => {
+            const highlightId = comment.dataset.highlightId;
+            const highlight = document.querySelector(`.highlight[data-comment-id="${highlightId}"]`);
+            
+            document.querySelectorAll('.highlight.active, .comment.active').forEach(el => {
+                el.classList.remove('active');
+                el.removeAttribute('data-linked');
+            });
+            
+            comment.classList.add('active');
+            comment.setAttribute('data-linked', 'true');
+            if (highlight) {
+                highlight.classList.add('active');
+                highlight.setAttribute('data-linked', 'true');
+                highlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        });
+    });
+}
+
+// Setup persona filters
+document.querySelectorAll('.persona-filters input[type="checkbox"]').forEach(checkbox => {
+    checkbox.addEventListener('change', () => {
+        const persona = checkbox.dataset.persona;
+        const isVisible = checkbox.checked;
+        
+        // Toggle visibility of highlights and comments
+        document.querySelectorAll(`.highlight.${persona}`).forEach(el => {
+            el.style.opacity = isVisible ? '1' : '0';
+            el.style.pointerEvents = isVisible ? 'auto' : 'none';
+        });
+        
+        document.querySelectorAll(`.comment.${persona}`).forEach(el => {
+            el.style.display = isVisible ? '' : 'none';
+        });
+    });
+});
+
+function updateGeneralComments(persona) {
+    const generalCommentsContent = document.querySelector('.general-comments-content');
+    if (!generalCommentsContent) return;
+
+    generalCommentsContent.innerHTML = '';
+
+    if (feedbackData[persona]?.generalComments) {
+        feedbackData[persona].generalComments.forEach(comment => {
+            const commentEl = document.createElement('div');
+            commentEl.className = `comment ${persona}`;
+            commentEl.textContent = comment;
+            generalCommentsContent.appendChild(commentEl);
+        });
+    }
+}
+
+// Setup general comments tabs
+const generalCommentsTabs = document.getElementById('generalCommentsTabs');
+if (generalCommentsTabs) {
+    generalCommentsTabs.addEventListener('click', (e) => {
+        if (e.target.classList.contains('tab')) {
+            document.querySelectorAll('#generalCommentsTabs .tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            e.target.classList.add('active');
+            updateGeneralComments(e.target.dataset.persona);
+        }
+    });
+}
+
+// Initialize persona prompts
+function initializePrompts() {
+    Object.keys(PERSONAS).forEach(persona => {
+        const promptElement = document.getElementById(`${persona}Prompt`);
+        if (promptElement) {
+            const savedPrompt = localStorage.getItem(`${persona}Prompt`);
+            promptElement.value = savedPrompt || getDefaultPrompt(persona);
+        }
+    });
+}
+
+// Save persona prompts
+function setupPromptHandlers() {
+    document.querySelectorAll('.system-prompt').forEach(prompt => {
+        prompt.addEventListener('change', () => {
+            localStorage.setItem(`${prompt.dataset.persona}Prompt`, prompt.value);
+        });
+    });
+
+    document.querySelectorAll('.reset-prompt').forEach(button => {
+        button.addEventListener('click', () => {
+            const persona = button.dataset.persona;
+            const promptElement = document.getElementById(`${persona}Prompt`);
+            if (promptElement) {
+                promptElement.value = getDefaultPrompt(persona);
+                localStorage.setItem(`${persona}Prompt`, promptElement.value);
+            }
+        });
+    });
+}
 
 // Tab switching
-tabsList.addEventListener('click', (e) => {
-    if (e.target.classList.contains('tab')) {
-        switchTab(e.target.dataset.tab);
-    }
-});
+if (tabsList) {
+    tabsList.addEventListener('click', (e) => {
+        if (e.target.classList.contains('tab')) {
+            switchTab(e.target.dataset.tab);
+        }
+    });
+}
 
-// New tab button
-newTabBtn.addEventListener('click', () => addTab());
+function resetProgress() {
+    document.querySelectorAll('.progress-item').forEach(item => {
+        const persona = item.classList[1];
+        item.classList.remove('complete');
+        item.textContent = `${PERSONAS[persona]} Feedback`;
+    });
 
-// Handle streaming responses
-ipcRenderer.on('stream-response', (event, chunk) => {
-    const activePanel = document.getElementById(activeTabId);
-    const output = activePanel.querySelector('.output');
-    if (output.textContent === '') {
-        output.textContent = chunk;
-    } else {
-        output.textContent += chunk;
+    document.querySelectorAll('.tab:not(.documents)').forEach(tab => {
+        tab.classList.add('disabled');
+    });
+
+    switchTab('documents');
+    const documentsTab = document.getElementById('documents');
+    if (documentsTab) {
+        const inputSection = documentsTab.querySelector('.input-section');
+        const controls = documentsTab.querySelector('.controls');
+        if (inputSection) inputSection.style.display = 'flex';
+        if (controls) controls.style.display = 'flex';
     }
-});
+}
+
+function markPersonaComplete(persona) {
+    const progressItem = document.querySelector(`.progress-item.${persona}`);
+    if (progressItem) {
+        progressItem.classList.add('complete');
+        progressItem.textContent = `${PERSONAS[persona]} Feedback (Complete)`;
+    }
+
+    const tab = document.querySelector(`.tab.${persona}`);
+    if (tab) {
+        tab.classList.remove('disabled');
+    }
+
+    const allComplete = Object.keys(PERSONAS).every(p => 
+        document.querySelector(`.progress-item.${p}`)?.classList.contains('complete')
+    );
+    if (allComplete) {
+        const allTab = document.querySelector('.tab.all');
+        if (allTab) {
+            allTab.classList.remove('disabled');
+        }
+    }
+}
+
+// Document control handlers
+function setupDocumentControls() {
+    document.querySelectorAll('.document-controls').forEach(controls => {
+        if (controls.closest('#documents')) {
+            controls.style.display = 'flex';
+        } else {
+            controls.style.display = 'none';
+        }
+    });
+
+    document.querySelectorAll('.new-doc-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.input-text').forEach(textarea => {
+                textarea.value = '';
+            });
+            resetProgress();
+            showInputView();
+        });
+    });
+
+    document.querySelectorAll('.add-doc-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const currentText = document.querySelector('.input-text').value;
+            document.querySelectorAll('.input-text').forEach(textarea => {
+                textarea.value = currentText + '\n\n';
+                textarea.focus();
+                textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+            });
+            resetProgress();
+            showInputView();
+        });
+    });
+
+    document.querySelectorAll('.edit-doc-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            resetProgress();
+            showInputView();
+        });
+    });
+}
+
+function showInputView() {
+    document.querySelectorAll('.tab-panel').forEach(panel => {
+        const inputView = panel.querySelector('.input-view');
+        const feedbackView = panel.querySelector('.feedback-view');
+        const inputSection = panel.querySelector('.input-section');
+        const controls = panel.querySelector('.controls');
+        
+        if (inputView && feedbackView) {
+            inputView.classList.remove('hidden');
+            feedbackView.classList.add('hidden');
+            
+            if (panel.id === 'documents') {
+                if (inputSection) inputSection.style.display = 'flex';
+                if (controls) controls.style.display = 'flex';
+            }
+        }
+    });
+}
+
+function showError(panel, message) {
+    if (!panel) return;
+
+    const inputView = panel.querySelector('.input-view');
+    const feedbackView = panel.querySelector('.feedback-view');
+    const documentContent = panel.querySelector('.document-content');
+    
+    if (inputView) inputView.classList.remove('hidden');
+    if (feedbackView) feedbackView.classList.add('hidden');
+    
+    const errorEl = document.createElement('div');
+    errorEl.className = 'error-message';
+    errorEl.textContent = message;
+    
+    if (documentContent) {
+        documentContent.innerHTML = '';
+        documentContent.appendChild(errorEl);
+    }
+}
 
 // Settings management
 const defaultSettings = {
@@ -205,8 +780,7 @@ const defaultSettings = {
     contextWindow: 4096,
     timeout: 120,
     stream: true,
-    temperature: 0.75,
-    systemPrompt: ''
+    temperature: 0.75
 };
 
 function loadSettings() {
@@ -220,41 +794,54 @@ function saveSettings() {
         contextWindow: parseInt(contextWindow.value),
         timeout: parseInt(timeout.value),
         stream: stream.checked,
-        temperature: parseFloat(temperature.value),
-        systemPrompt: systemPrompt.value
+        temperature: parseFloat(temperature.value)
     };
     localStorage.setItem('settings', JSON.stringify(settings));
 }
 
-// Apply settings to UI
 function applySettings(settings) {
-    contextWindow.value = settings.contextWindow;
-    timeout.value = settings.timeout;
-    stream.checked = settings.stream;
-    temperature.value = settings.temperature;
-    temperatureValue.textContent = settings.temperature;
-    systemPrompt.value = settings.systemPrompt;
+    if (!settings) return;
+    
+    if (contextWindow) contextWindow.value = settings.contextWindow;
+    if (timeout) timeout.value = settings.timeout;
+    if (stream) stream.checked = settings.stream;
+    if (temperature) temperature.value = settings.temperature;
+    if (temperatureValue) temperatureValue.textContent = settings.temperature;
 }
 
 // View switching
-settingsBtn.addEventListener('click', () => {
-    const isSettingsVisible = !settingsView.classList.contains('hidden');
-    mainView.classList.toggle('hidden', !isSettingsVisible);
-    settingsView.classList.toggle('hidden', isSettingsVisible);
+if (settingsBtn) {
+    settingsBtn.addEventListener('click', () => {
+        if (mainView) mainView.classList.add('hidden');
+        if (settingsView) settingsView.classList.remove('hidden');
+    });
+}
+
+saveCloseBtn.addEventListener('click', () => {
+    saveSettings();
+    if (mainView) mainView.classList.remove('hidden');
+    if (settingsView) settingsView.classList.add('hidden');
 });
 
 // Settings change handlers
-[contextWindow, timeout, stream, temperature, systemPrompt].forEach(element => {
-    element.addEventListener('change', saveSettings);
+[contextWindow, timeout, stream, temperature].forEach(element => {
+    if (element) {
+        element.addEventListener('change', saveSettings);
+    }
 });
 
-temperature.addEventListener('input', (e) => {
-    temperatureValue.textContent = e.target.value;
-});
-
+if (temperature) {
+    temperature.addEventListener('input', (e) => {
+        if (temperatureValue) {
+            temperatureValue.textContent = e.target.value;
+        }
+    });
+}
 
 // Load models from Ollama
 async function loadModels() {
+    if (!modelSelect) return;
+
     try {
         const models = await ipcRenderer.invoke('get-models');
         modelSelect.innerHTML = models.map(model => 
@@ -266,8 +853,59 @@ async function loadModels() {
     }
 }
 
+// Initialize UI
+setupFileUploadHandlers();
+setupSubmitHandlers();
+setupDocumentControls();
+initializePrompts();
+setupPromptHandlers();
+
+// Add error message styles
+const style = document.createElement('style');
+style.textContent = `
+    .error-message {
+        color: #d0021b;
+        padding: 15px;
+        background: #fff;
+        border-radius: 4px;
+        border-left: 4px solid #d0021b;
+        margin: 10px 0;
+    }
+`;
+document.head.appendChild(style);
+
+// Sync text across panels
+document.querySelectorAll('.input-text').forEach(textarea => {
+    textarea.addEventListener('input', (e) => {
+        const text = e.target.value;
+        document.querySelectorAll('.input-text').forEach(otherTextarea => {
+            if (otherTextarea !== e.target) {
+                otherTextarea.value = text;
+            }
+        });
+        resetProgress();
+    });
+});
+
+// Handle streaming responses
+ipcRenderer.on('stream-response', (event, { chunk, persona }) => {
+    const panel = document.getElementById(persona);
+    if (!panel) return;
+
+    const documentContent = panel.querySelector('.document-content');
+    if (!documentContent) return;
+
+    if (documentContent.textContent === '') {
+        documentContent.textContent = chunk;
+    } else {
+        documentContent.textContent += chunk;
+    }
+});
+
 // Initialize settings and load models
 const settings = loadSettings();
 applySettings(settings);
 loadModels();
-modelSelect.addEventListener('change', saveSettings);
+if (modelSelect) {
+    modelSelect.addEventListener('change', saveSettings);
+}

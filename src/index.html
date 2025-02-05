@@ -8,36 +8,282 @@
     <div class="container">
         <header>
             <h1>Hello Llama</h1>
-            <button id="settingsBtn" class="icon-button">⚙️</button>
+            <div class="header-buttons">
+                <button id="settingsBtn" class="icon-button">⚙️</button>
+            </div>
         </header>
 
         <div id="mainView" class="view">
             <div class="tabs-container">
                 <div class="tabs-header">
                     <div class="tabs-list" id="tabsList">
-                        <button class="tab active" data-tab="tab1">Tab 1</button>
-                        <button class="new-tab" id="newTabBtn">+</button>
+                        <button class="tab active documents" data-tab="documents">Documents for Feedback</button>
+                        <button class="tab management disabled" data-tab="management">Senior Management</button>
+                        <button class="tab technical disabled" data-tab="technical">Technical Project Manager</button>
+                        <button class="tab hr disabled" data-tab="hr">HR</button>
+                        <button class="tab legal disabled" data-tab="legal">Legal</button>
+                        <button class="tab junior disabled" data-tab="junior">New Junior Team Member</button>
+                        <button class="tab all disabled" data-tab="all">All Feedback</button>
                     </div>
                 </div>
                 
                 <div class="tabs-content">
-                    <div class="tab-panel active" id="tab1">
-                        <div class="split-pane">
-                            <div class="input-pane">
+                    <div class="tab-panel active" id="documents">
+                        <div class="document-controls">
+                            <button class="new-doc-btn">New Document</button>
+                            <button class="add-doc-btn">Add Document</button>
+                            <button class="edit-doc-btn">Edit Document</button>
+                        </div>
+                        <div class="content-view">
+                            <div class="input-view">
                                 <div class="input-section">
                                     <textarea class="input-text" placeholder="Type your text here or upload a file..."></textarea>
-                                    
                                     <div class="controls">
                                         <input type="file" class="file-input" accept=".txt,.pdf,.doc,.docx">
                                         <button class="submit-btn">Process Text</button>
-                                        <button class="clone-btn">Clone Tab</button>
                                     </div>
                                 </div>
                             </div>
+                            <div class="progress-indicators">
+                                <div class="progress-item management">Senior Management Feedback</div>
+                                <div class="progress-item technical">Technical PM Feedback</div>
+                                <div class="progress-item hr">HR Feedback</div>
+                                <div class="progress-item legal">Legal Feedback</div>
+                                <div class="progress-item junior">Junior Team Member Feedback</div>
+                            </div>
+                        </div>
+                    </div>
 
-                            <div class="output-pane">
-                                <div class="loading hidden">Processing...</div>
-                                <div class="output"></div>
+                    <div class="tab-panel" id="management">
+                        <div class="document-controls">
+                            <button class="new-doc-btn">New Document</button>
+                            <button class="add-doc-btn">Add Document</button>
+                            <button class="edit-doc-btn">Edit Document</button>
+                        </div>
+                        <div class="content-view">
+                            <div class="input-view">
+                                <div class="input-section">
+                                    <textarea class="input-text" placeholder="Type your text here or upload a file..."></textarea>
+                                    <div class="controls">
+                                        <input type="file" class="file-input" accept=".txt,.pdf,.doc,.docx">
+                                        <button class="submit-btn">Process Text</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="feedback-view hidden">
+                                <div class="feedback-scores">
+                                    <h3>Attribute Scores</h3>
+                                    <div class="scores-content"></div>
+                                </div>
+                                <div class="feedback-container">
+                                    <div class="feedback-sidebar">
+                                        <div class="snippet-comments">
+                                            <h3>Specific Feedback</h3>
+                                            <div class="snippet-comments-content"></div>
+                                        </div>
+                                    </div>
+                                    <div class="document-view">
+                                        <div class="document-content"></div>
+                                    </div>
+                                </div>
+                                <div class="general-comments">
+                                    <h3>General Comments</h3>
+                                    <div class="general-comments-content"></div>
+                                </div>
+                            </div>
+                            <div class="loading hidden">Processing...</div>
+                        </div>
+                    </div>
+                    <div class="tab-panel" id="technical">
+                        <div class="document-controls">
+                            <button class="new-doc-btn">New Document</button>
+                            <button class="add-doc-btn">Add Document</button>
+                            <button class="edit-doc-btn">Edit Document</button>
+                        </div>
+                        <div class="content-view">
+                            <div class="input-view">
+                                <div class="input-section">
+                                    <textarea class="input-text" placeholder="Type your text here or upload a file..."></textarea>
+                                    <div class="controls">
+                                        <input type="file" class="file-input" accept=".txt,.pdf,.doc,.docx">
+                                        <button class="submit-btn">Process Text</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="feedback-view hidden">
+                                <div class="feedback-scores">
+                                    <h3>Attribute Scores</h3>
+                                    <div class="scores-content"></div>
+                                </div>
+                                <div class="feedback-container">
+                                    <div class="feedback-sidebar">
+                                        <div class="snippet-comments">
+                                            <h3>Specific Feedback</h3>
+                                            <div class="snippet-comments-content"></div>
+                                        </div>
+                                    </div>
+                                    <div class="document-view">
+                                        <div class="document-content"></div>
+                                    </div>
+                                </div>
+                                <div class="general-comments">
+                                    <h3>General Comments</h3>
+                                    <div class="general-comments-content"></div>
+                                </div>
+                            </div>
+                            <div class="loading hidden">Processing...</div>
+                        </div>
+                    </div>
+                    <div class="tab-panel" id="hr">
+                        <div class="document-controls">
+                            <button class="new-doc-btn">New Document</button>
+                            <button class="add-doc-btn">Add Document</button>
+                            <button class="edit-doc-btn">Edit Document</button>
+                        </div>
+                        <div class="content-view">
+                            <div class="input-view">
+                                <div class="input-section">
+                                    <textarea class="input-text" placeholder="Type your text here or upload a file..."></textarea>
+                                    <div class="controls">
+                                        <input type="file" class="file-input" accept=".txt,.pdf,.doc,.docx">
+                                        <button class="submit-btn">Process Text</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="feedback-view hidden">
+                                <div class="feedback-scores">
+                                    <h3>Attribute Scores</h3>
+                                    <div class="scores-content"></div>
+                                </div>
+                                <div class="feedback-container">
+                                    <div class="feedback-sidebar">
+                                        <div class="snippet-comments">
+                                            <h3>Specific Feedback</h3>
+                                            <div class="snippet-comments-content"></div>
+                                        </div>
+                                    </div>
+                                    <div class="document-view">
+                                        <div class="document-content"></div>
+                                    </div>
+                                </div>
+                                <div class="general-comments">
+                                    <h3>General Comments</h3>
+                                    <div class="general-comments-content"></div>
+                                </div>
+                            </div>
+                            <div class="loading hidden">Processing...</div>
+                        </div>
+                    </div>
+                    <div class="tab-panel" id="legal">
+                        <div class="document-controls">
+                            <button class="new-doc-btn">New Document</button>
+                            <button class="add-doc-btn">Add Document</button>
+                            <button class="edit-doc-btn">Edit Document</button>
+                        </div>
+                        <div class="content-view">
+                            <div class="input-view">
+                                <div class="input-section">
+                                    <textarea class="input-text" placeholder="Type your text here or upload a file..."></textarea>
+                                    <div class="controls">
+                                        <input type="file" class="file-input" accept=".txt,.pdf,.doc,.docx">
+                                        <button class="submit-btn">Process Text</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="feedback-view hidden">
+                                <div class="feedback-scores">
+                                    <h3>Attribute Scores</h3>
+                                    <div class="scores-content"></div>
+                                </div>
+                                <div class="feedback-container">
+                                    <div class="feedback-sidebar">
+                                        <div class="snippet-comments">
+                                            <h3>Specific Feedback</h3>
+                                            <div class="snippet-comments-content"></div>
+                                        </div>
+                                    </div>
+                                    <div class="document-view">
+                                        <div class="document-content"></div>
+                                    </div>
+                                </div>
+                                <div class="general-comments">
+                                    <h3>General Comments</h3>
+                                    <div class="general-comments-content"></div>
+                                </div>
+                            </div>
+                            <div class="loading hidden">Processing...</div>
+                        </div>
+                    </div>
+                    <div class="tab-panel" id="junior">
+                        <div class="document-controls">
+                            <button class="new-doc-btn">New Document</button>
+                            <button class="add-doc-btn">Add Document</button>
+                            <button class="edit-doc-btn">Edit Document</button>
+                        </div>
+                        <div class="content-view">
+                            <div class="input-view">
+                                <div class="input-section">
+                                    <textarea class="input-text" placeholder="Type your text here or upload a file..."></textarea>
+                                    <div class="controls">
+                                        <input type="file" class="file-input" accept=".txt,.pdf,.doc,.docx">
+                                        <button class="submit-btn">Process Text</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="feedback-view hidden">
+                                <div class="feedback-scores">
+                                    <h3>Attribute Scores</h3>
+                                    <div class="scores-content"></div>
+                                </div>
+                                <div class="feedback-container">
+                                    <div class="feedback-sidebar">
+                                        <div class="snippet-comments">
+                                            <h3>Specific Feedback</h3>
+                                            <div class="snippet-comments-content"></div>
+                                        </div>
+                                    </div>
+                                    <div class="document-view">
+                                        <div class="document-content"></div>
+                                    </div>
+                                </div>
+                                <div class="general-comments">
+                                    <h3>General Comments</h3>
+                                    <div class="general-comments-content"></div>
+                                </div>
+                            </div>
+                            <div class="loading hidden">Processing...</div>
+                        </div>
+                    </div>
+                    <div class="tab-panel" id="all">
+                        <div class="feedback-view">
+                            <div class="feedback-scores">
+                                <h3>Attribute Scores</h3>
+                                <div class="scores-content"></div>
+                            </div>
+                            <div class="all-feedback-container">
+                                <div class="feedback-sidebar">
+                                    <div class="persona-filters">
+                                        <h3>Filters</h3>
+                                        <div class="filter-options">
+                                            <label><input type="checkbox" data-persona="management" checked> Senior Management</label>
+                                            <label><input type="checkbox" data-persona="technical" checked> Technical Project Manager</label>
+                                            <label><input type="checkbox" data-persona="hr" checked> HR</label>
+                                            <label><input type="checkbox" data-persona="legal" checked> Legal</label>
+                                            <label><input type="checkbox" data-persona="junior" checked> New Junior Team Member</label>
+                                        </div>
+                                    </div>
+                                    <div class="snippet-comments">
+                                        <h3>Specific Feedback</h3>
+                                        <div class="snippet-comments-content"></div>
+                                    </div>
+                                </div>
+                                <div class="document-view">
+                                    <div class="document-content"></div>
+                                </div>
+                            </div>
+                            <div class="general-comments">
+                                <h3>General Comments</h3>
+                                <div class="general-comments-content"></div>
                             </div>
                         </div>
                     </div>
@@ -75,8 +321,32 @@
             </div>
 
             <div class="settings-group">
-                <label for="systemPrompt">System Prompt:</label>
-                <textarea id="systemPrompt" placeholder="Enter a system prompt to be applied to all submissions..."></textarea>
+                <h3>Persona System Prompts</h3>
+                <div class="prompt-group management">
+                    <label for="managementPrompt">Senior Management:</label>
+                    <textarea id="managementPrompt" class="system-prompt" data-persona="management"></textarea>
+                    <button class="reset-prompt" data-persona="management">Reset to Default</button>
+                </div>
+                <div class="prompt-group technical">
+                    <label for="technicalPrompt">Technical Project Manager:</label>
+                    <textarea id="technicalPrompt" class="system-prompt" data-persona="technical"></textarea>
+                    <button class="reset-prompt" data-persona="technical">Reset to Default</button>
+                </div>
+                <div class="prompt-group hr">
+                    <label for="hrPrompt">HR:</label>
+                    <textarea id="hrPrompt" class="system-prompt" data-persona="hr"></textarea>
+                    <button class="reset-prompt" data-persona="hr">Reset to Default</button>
+                </div>
+                <div class="prompt-group legal">
+                    <label for="legalPrompt">Legal:</label>
+                    <textarea id="legalPrompt" class="system-prompt" data-persona="legal"></textarea>
+                    <button class="reset-prompt" data-persona="legal">Reset to Default</button>
+                </div>
+                <div class="prompt-group junior">
+                    <label for="juniorPrompt">New Junior Team Member:</label>
+                    <textarea id="juniorPrompt" class="system-prompt" data-persona="junior"></textarea>
+                    <button class="reset-prompt" data-persona="junior">Reset to Default</button>
+                </div>
             </div>
         </div>
     </div>

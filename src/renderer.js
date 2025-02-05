@@ -147,14 +147,20 @@ function setupFileUploadHandlers() {
                         break;
 
                     case 'pdf':
-                        const pdfBuffer = await new Promise((resolve, reject) => {
-                            const reader = new FileReader();
-                            reader.onload = (e) => resolve(e.target.result);
-                            reader.onerror = (e) => reject(new Error('Failed to read PDF file'));
-                            reader.readAsArrayBuffer(file);
-                        });
-                        const pdfData = await pdfParse(Buffer.from(pdfBuffer));
-                        text = pdfData.text;
+                        try {
+                            const pdfBuffer = await new Promise((resolve, reject) => {
+                                const reader = new FileReader();
+                                reader.onload = (e) => resolve(e.target.result);
+                                reader.onerror = (e) => reject(new Error('Failed to read PDF file'));
+                                reader.readAsArrayBuffer(file);
+                            });
+                            // Convert ArrayBuffer to Buffer correctly
+                            const buffer = Buffer.from(new Uint8Array(pdfBuffer));
+                            const pdfData = await pdfParse(buffer);
+                            text = pdfData.text;
+                        } catch (error) {
+                            throw new Error(`PDF parsing failed: ${error.message}`);
+                        }
                         break;
 
                     case 'doc':
@@ -257,7 +263,78 @@ function setupSubmitHandlers() {
                     markPersonaComplete(persona);
                 } catch (error) {
                     console.error('Error processing text:', error);
-                    showError(personaPanel, 'Error processing text: ' + error.message);
+                    
+                    // Create retry button
+                    const retryBtn = document.createElement('button');
+                    retryBtn.textContent = 'Retry';
+                    retryBtn.style.cssText = `
+                        padding: 8px 16px;
+                        background: #4CAF50;
+                        color: white;
+                        border: none;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        margin-top: 10px;
+                    `;
+                    
+                    // Handle different error types
+                    let errorMessage;
+                    if (error.message.includes('timeout')) {
+                        errorMessage = `${PERSONAS[persona]} was in a meeting.`;
+                    } else if (error.message.includes('JSON')) {
+                        errorMessage = `I can't understand ${PERSONAS[persona]}'s feedback.`;
+                    } else {
+                        errorMessage = 'Error processing text: ' + error.message;
+                    }
+                    
+                    // Show error with retry button
+                    const errorContainer = document.createElement('div');
+                    errorContainer.className = 'error-message';
+                    errorContainer.textContent = errorMessage;
+                    errorContainer.appendChild(retryBtn);
+                    
+                    // Add retry functionality
+                    retryBtn.addEventListener('click', async () => {
+                        try {
+                            // Hide error and show loading
+                            errorContainer.remove();
+                            personaLoading.classList.remove('hidden');
+                            
+                            const response = await ipcRenderer.invoke('process-text', {
+                                text,
+                                settings: {
+                                    ...currentSettings,
+                                    seed: seed?.value ? parseInt(seed.value) : undefined
+                                }
+                            });
+                            
+                            // Store raw response for debugging
+                            rawResponses[persona] = response;
+                            const parsedResponse = JSON.parse(response);
+                            feedbackData[persona] = parsedResponse;
+                            
+                            // Update feedback display
+                            createFeedbackDisplay(parsedResponse, persona);
+                            
+                            // Update progress and enable tab
+                            markPersonaComplete(persona);
+                            
+                            // Update all feedback view if all personas are complete
+                            const allComplete = Object.keys(PERSONAS).every(p => 
+                                document.querySelector(`.progress-item.${p}`)?.classList.contains('complete')
+                            );
+                            if (allComplete) {
+                                updateAllFeedbackView();
+                            }
+                        } catch (retryError) {
+                            console.error('Error retrying:', retryError);
+                            showError(personaPanel, errorMessage);
+                        } finally {
+                            personaLoading.classList.add('hidden');
+                        }
+                    });
+                    
+                    showError(personaPanel, errorContainer);
                 } finally {
                     personaLoading.classList.add('hidden');
                     inputView.classList.remove('hidden');
@@ -740,22 +817,53 @@ function updateAllFeedbackView() {
 }
 
 function setupAllFeedbackInteractions() {
+    // Highlight click handler
     document.querySelectorAll('.document-content .highlight').forEach(highlight => {
         highlight.addEventListener('click', () => {
             const commentId = highlight.dataset.commentId;
-            const comment = document.querySelector(`.comment[data-highlight-id="${commentId}"]`);
+            const comments = document.querySelectorAll(`.comment[data-highlight-id="${commentId}"]`);
             
+            // Remove active state from all elements
             document.querySelectorAll('.highlight.active, .comment.active').forEach(el => {
                 el.classList.remove('active');
                 el.removeAttribute('data-linked');
             });
             
+            // Activate highlight and comments
             highlight.classList.add('active');
             highlight.setAttribute('data-linked', 'true');
-            if (comment) {
+            
+            comments.forEach(comment => {
                 comment.classList.add('active');
                 comment.setAttribute('data-linked', 'true');
-                comment.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            });
+            
+            // Scroll to the first comment
+            if (comments.length > 0) {
+                comments[0].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        });
+    });
+
+    // Comment click handler
+    document.querySelectorAll('.snippet-comments-content .comment').forEach(comment => {
+        comment.addEventListener('click', () => {
+            const highlightId = comment.dataset.highlightId;
+            const highlight = document.querySelector(`.highlight[data-comment-id="${highlightId}"]`);
+            
+            // Remove active state from all elements
+            document.querySelectorAll('.highlight.active, .comment.active').forEach(el => {
+                el.classList.remove('active');
+                el.removeAttribute('data-linked');
+            });
+            
+            // Activate comment and highlight
+            comment.classList.add('active');
+            comment.setAttribute('data-linked', 'true');
+            if (highlight) {
+                highlight.classList.add('active');
+                highlight.setAttribute('data-linked', 'true');
+                highlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
         });
     });

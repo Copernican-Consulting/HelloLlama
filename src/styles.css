@@ -325,6 +325,7 @@ h2 {
     border-radius: 4px;
     padding: 20px;
     min-height: 100%;
+    overflow-y: visible;
 }
 
 .document-view {
@@ -354,15 +355,71 @@ h2 {
     margin-top: 0;
 }
 
-/* Ensure proper spacing between comments */
+/* Comment Styles */
 .comment {
-    margin-bottom: 15px;
-    min-height: 60px;
+    padding: 10px;
+    margin: 0 0 10px 0;
+    background: white;
+    border-radius: 4px;
+    border-left: 4px solid;
+    cursor: pointer;
+    transition: all 0.2s ease;
     position: relative;
+    scroll-margin-top: 15px;
+    min-height: 60px;
 }
 
-.comment + .comment {
-    margin-top: 15px;
+.comment:hover {
+    transform: translateX(2px);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    z-index: 2;
+}
+
+.comment .snippet-preview {
+    display: none;
+    position: fixed;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 250px;
+    max-height: 200px;
+    overflow-y: auto;
+    background: white;
+    border: 1px solid currentColor;
+    border-radius: 4px;
+    padding: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    z-index: 9999;
+    font-size: 0.9em;
+    color: #666;
+    pointer-events: none;
+}
+
+.comment:hover .snippet-preview {
+    display: block;
+}
+
+.comment.management { border-color: var(--management-color); }
+.comment.technical { border-color: var(--technical-color); }
+.comment.hr { border-color: var(--hr-color); }
+.comment.legal { border-color: var(--legal-color); }
+.comment.junior { border-color: var(--junior-color); }
+
+.comment.active {
+    box-shadow: 0 0 0 2px currentColor;
+    transform: translateX(4px);
+}
+
+/* Comment positioning in persona tabs */
+.tab-panel:not(#all) .snippet-comments-content {
+    padding-right: 10px;
+    padding-bottom: 20px;
+}
+
+.tab-panel:not(#all) .comment[data-offset] {
+    position: absolute;
+    width: calc(100% - 10px);
+    left: 0;
 }
 
 /* Comment Count */
@@ -504,90 +561,6 @@ h2 {
     z-index: 3;
 }
 
-/* Comment Styles */
-.comment {
-    padding: 10px;
-    margin: 0 0 10px 0;
-    background: white;
-    border-radius: 4px;
-    border-left: 4px solid;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    position: relative;
-    scroll-margin-top: 15px;
-}
-
-.comment:hover {
-    transform: translateX(2px);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.comment {
-    position: relative;
-    z-index: 1;
-}
-
-.comment:hover {
-    z-index: 2;
-}
-
-.comment .snippet-preview {
-    display: none;
-    position: absolute;
-    left: calc(100% + 10px);
-    top: 50%;
-    transform: translateY(-50%);
-    width: 250px;
-    background: white;
-    border: 1px solid currentColor;
-    border-radius: 4px;
-    padding: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    z-index: 10;
-    font-size: 0.9em;
-    color: #666;
-    pointer-events: none;
-}
-
-.comment:hover .snippet-preview {
-    display: block;
-}
-
-.comment.management { border-color: var(--management-color); }
-.comment.technical { border-color: var(--technical-color); }
-.comment.hr { border-color: var(--hr-color); }
-.comment.legal { border-color: var(--legal-color); }
-.comment.junior { border-color: var(--junior-color); }
-
-.comment.active {
-    box-shadow: 0 0 0 2px currentColor;
-    transform: translateX(4px);
-}
-
-/* Comment positioning in persona tabs */
-.tab-panel:not(#all) .snippet-comments-content {
-    padding-right: 10px;
-    padding-bottom: 20px;
-}
-
-.tab-panel:not(#all) .comment[data-offset] {
-    position: absolute;
-    width: calc(100% - 10px);
-    left: 0;
-}
-
-/* Minimum space between comments */
-.comment {
-    margin-bottom: 15px;
-    min-height: 60px;
-}
-
-/* Ensure comments don't overlap when repositioned */
-.tab-panel:not(#all) .comment[data-offset] + .comment[data-offset] {
-    margin-top: 15px;
-}
-
-
 /* All page specific styles */
 #all .feedback-view {
     display: flex;
@@ -610,7 +583,7 @@ h2 {
 
 #all .feedback-sidebar {
     width: 300px;
-    overflow-y: auto;
+    overflow-y: visible;
     max-height: none;
     display: flex;
     flex-direction: column;
@@ -624,6 +597,7 @@ h2 {
     display: flex;
     flex-direction: column;
     gap: 10px;
+    overflow-y: visible;
 }
 
 #all .document-view {

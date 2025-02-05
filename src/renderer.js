@@ -148,18 +148,41 @@ function setupFileUploadHandlers() {
 
                     case 'pdf':
                         try {
+                            showError(panel, 'Reading PDF file...');
+                            
                             const pdfBuffer = await new Promise((resolve, reject) => {
                                 const reader = new FileReader();
-                                reader.onload = (e) => resolve(e.target.result);
-                                reader.onerror = (e) => reject(new Error('Failed to read PDF file'));
+                                reader.onload = (e) => {
+                                    showError(panel, 'PDF file loaded, preparing to parse...');
+                                    resolve(e.target.result);
+                                };
+                                reader.onerror = (e) => {
+                                    console.error('Failed to read PDF file:', e.target.error);
+                                    reject(new Error('Failed to read PDF file: ' + e.target.error));
+                                };
                                 reader.readAsArrayBuffer(file);
                             });
-                            // Convert ArrayBuffer to Buffer correctly
+                            
+                            showError(panel, 'Converting file data...');
                             const buffer = Buffer.from(new Uint8Array(pdfBuffer));
+                            
+                            showError(panel, 'Parsing PDF content...');
                             const pdfData = await pdfParse(buffer);
+                            
+                            if (!pdfData || !pdfData.text) {
+                                throw new Error('No text content found in PDF');
+                            }
+                            
+                            showError(panel, `PDF parsed successfully: ${pdfData.numpages} pages`);
                             text = pdfData.text;
+                            
                         } catch (error) {
-                            throw new Error(`PDF parsing failed: ${error.message}`);
+                            console.error('PDF parsing error:', {
+                                error: error.message,
+                                stack: error.stack,
+                                name: error.name
+                            });
+                            throw new Error(`PDF import failed: ${error.message}`);
                         }
                         break;
 
@@ -851,7 +874,23 @@ function setupAllFeedbackInteractions() {
             // Scroll to the first visible comment
             if (visibleComments.length > 0) {
                 const comment = visibleComments[0];
-                comment.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                const container = document.querySelector('#all .all-feedback-container');
+                if (container) {
+                    // Get the container's scroll position and dimensions
+                    const containerRect = container.getBoundingClientRect();
+                    const commentRect = comment.getBoundingClientRect();
+                    
+                    // Calculate if comment is in view
+                    const isInView = (
+                        commentRect.top >= containerRect.top &&
+                        commentRect.bottom <= containerRect.bottom
+                    );
+                    
+                    // If not in view, scroll to it
+                    if (!isInView) {
+                        comment.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }
             }
         });
     });
@@ -874,7 +913,24 @@ function setupAllFeedbackInteractions() {
             if (highlight) {
                 highlight.classList.add('active');
                 highlight.setAttribute('data-linked', 'true');
-                highlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                
+                const container = document.querySelector('#all .all-feedback-container');
+                if (container) {
+                    // Get the container's scroll position and dimensions
+                    const containerRect = container.getBoundingClientRect();
+                    const highlightRect = highlight.getBoundingClientRect();
+                    
+                    // Calculate if highlight is in view
+                    const isInView = (
+                        highlightRect.top >= containerRect.top &&
+                        highlightRect.bottom <= containerRect.bottom
+                    );
+                    
+                    // If not in view, scroll to it
+                    if (!isInView) {
+                        highlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }
             }
         });
     });

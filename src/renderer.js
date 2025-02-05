@@ -288,6 +288,15 @@ function createFeedbackDisplay(feedback, persona, rawResponse = null) {
     inputView.classList.add('hidden');
     feedbackView.classList.remove('hidden');
 
+    // Calculate line heights and positions
+    const tempSpan = document.createElement('span');
+    tempSpan.style.visibility = 'hidden';
+    tempSpan.style.whiteSpace = 'pre-wrap';
+    tempSpan.textContent = 'X';
+    documentContent.appendChild(tempSpan);
+    const lineHeight = tempSpan.offsetHeight;
+    tempSpan.remove();
+
     // Setup debug button
     const debugBtn = panel.querySelector('.debug-btn');
     if (debugBtn) {
@@ -316,34 +325,45 @@ function createFeedbackDisplay(feedback, persona, rawResponse = null) {
     // Display document with highlights
     documentContent.innerHTML = currentText;
     
-    // Add snippet comments
+    // Add snippet comments with vertical positioning
     snippetCommentsContent.innerHTML = '';
     if (feedback.snippetFeedback) {
         const sortedSnippets = feedback.snippetFeedback
-            .map(({ snippet, comment }) => ({
-                snippet,
-                comment,
-                index: currentText.indexOf(snippet)
-            }))
+            .map(({ snippet, comment }) => {
+                const index = currentText.indexOf(snippet);
+                // Calculate vertical position based on text before the snippet
+                const textBefore = currentText.substring(0, index);
+                const lines = textBefore.split('\n');
+                const verticalOffset = lines.length * lineHeight;
+                
+                return {
+                    snippet,
+                    comment,
+                    index,
+                    verticalOffset
+                };
+            })
             .filter(item => item.index !== -1)
-            .sort((a, b) => b.index - a.index);
+            .sort((a, b) => a.index - b.index);
 
         let result = '';
-        
-        // Create an array of all highlight positions
         const highlights = [];
-        sortedSnippets.forEach(({ snippet, comment, index }) => {
+        
+        sortedSnippets.forEach(({ snippet, comment, index, verticalOffset }) => {
             highlights.push({
                 start: index,
                 end: index + snippet.length,
                 snippet,
                 comment,
-                persona
+                persona,
+                verticalOffset
             });
 
             const commentEl = document.createElement('div');
             commentEl.className = `comment ${persona}`;
             commentEl.setAttribute('data-highlight-id', `${persona}-${index}`);
+            commentEl.setAttribute('data-offset', verticalOffset);
+            commentEl.style.top = `${verticalOffset}px`;
             commentEl.innerHTML = `
                 <div class="comment-text">${comment}</div>
                 <div class="snippet-preview">"${snippet}"</div>
@@ -405,8 +425,22 @@ function createFeedbackDisplay(feedback, persona, rawResponse = null) {
         });
     }
 
-    // Setup interactions
+    // Setup interactions with smooth scrolling
     setupFeedbackInteractions(panel, persona);
+    
+    // Add click-to-comment functionality
+    panel.querySelectorAll('.highlight').forEach(highlight => {
+        highlight.style.cursor = 'pointer';
+        highlight.addEventListener('click', () => {
+            const commentId = highlight.dataset.commentId;
+            const comment = panel.querySelector(`.comment[data-highlight-id="${commentId}"]`);
+            if (comment) {
+                comment.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                comment.classList.add('active');
+                setTimeout(() => comment.classList.remove('active'), 2000);
+            }
+        });
+    });
 }
 
 function setupFeedbackInteractions(panel, persona) {
@@ -462,10 +496,9 @@ function updateAllFeedbackView() {
     const documentContent = panel.querySelector('.document-content');
     const snippetCommentsContent = panel.querySelector('.snippet-comments-content');
     const generalCommentsContent = panel.querySelector('.general-comments-content');
-    const scoresContent = panel.querySelector('.scores-content');
     const debugBtn = panel.querySelector('.debug-btn');
 
-    if (!documentContent || !snippetCommentsContent || !generalCommentsContent || !scoresContent) return;
+    if (!documentContent || !snippetCommentsContent || !generalCommentsContent) return;
 
     // Setup debug button for all tab
     if (debugBtn) {
@@ -497,47 +530,12 @@ function updateAllFeedbackView() {
         });
     }
 
+    // Clear existing content
     documentContent.innerHTML = currentText;
     snippetCommentsContent.innerHTML = '';
     generalCommentsContent.innerHTML = '';
-    scoresContent.innerHTML = '';
 
     if (!currentText) return;
-
-    // Calculate average scores
-    const averageScores = {};
-    let personaCount = 0;
-    
-    for (const feedback of Object.values(feedbackData)) {
-        if (!feedback.scores) continue;
-        personaCount++;
-        
-        for (const [criterion, score] of Object.entries(feedback.scores)) {
-            if (!averageScores[criterion]) {
-                averageScores[criterion] = 0;
-            }
-            averageScores[criterion] += score;
-        }
-    }
-
-    if (personaCount > 0) {
-        for (const [criterion, totalScore] of Object.entries(averageScores)) {
-            const averageScore = Math.round(totalScore / personaCount);
-            const scoreClass = averageScore < 70 ? 'low' : averageScore < 85 ? 'medium' : 'high';
-            
-            scoresContent.innerHTML += `
-                <div class="score-bar">
-                    <div class="score-label">
-                        <span>${criterion.charAt(0).toUpperCase() + criterion.slice(1)}</span>
-                        <span>${averageScore}/100</span>
-                    </div>
-                    <div class="score-progress">
-                        <div class="score-fill ${scoreClass}" style="width: ${averageScore}%"></div>
-                    </div>
-                </div>
-            `;
-        }
-    }
 
     // Collect all highlights and find overlapping regions
     const regions = [];

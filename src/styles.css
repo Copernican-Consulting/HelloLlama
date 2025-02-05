@@ -14,7 +14,7 @@ body {
 }
 
 .container {
-    max-width: 1160px;
+    max-width: min(1160px, 95vw);
     margin: 0 auto;
     background-color: white;
     padding: 20px;
@@ -74,7 +74,8 @@ h2 {
     border-radius: 4px 4px 0 0;
     background: #f5f5f5;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 16px;
+    font-weight: bold;
     min-width: 150px;
     text-align: center;
     transition: all 0.2s ease;
@@ -157,7 +158,7 @@ h2 {
 
 .input-text {
     flex: 1;
-    min-height: 0;
+    min-height: 200px;
     resize: none;
     width: 100%;
     padding: 10px;
@@ -253,21 +254,22 @@ h2 {
     display: flex;
     flex-direction: column;
     gap: 20px;
-    overflow: hidden;
-    min-height: 0;
+    overflow-y: auto;
+    max-height: 100%;
+    position: sticky;
+    top: 0;
 }
 
 .snippet-comments {
     flex: 1;
-    overflow: hidden;
     display: flex;
     flex-direction: column;
-    min-height: 0;
 }
 
 .snippet-comments-content {
-    flex: 1;
-    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
 
 .document-view {
@@ -310,34 +312,46 @@ h2 {
     position: relative;
     z-index: 1;
     padding: 2px 0;
+    text-decoration: none;
 }
 
 .highlight:hover {
     z-index: 2;
-    filter: brightness(1.2);
+    filter: brightness(1.1);
     transform: scale(1.01);
+    text-decoration: underline;
 }
 
-/* Single persona highlights */
-.highlight[data-personas="management"] { 
-    background-color: color-mix(in srgb, var(--management-color) 25%, transparent);
+/* Single persona highlights - consistent across all pages */
+.highlight[data-personas="management"],
+.tab-panel[id="management"] .highlight { 
+    background-color: color-mix(in srgb, var(--management-color) 40%, transparent);
     border: 1px solid var(--management-color);
+    box-shadow: 0 1px 3px rgba(74, 144, 226, 0.3);
 }
-.highlight[data-personas="technical"] { 
-    background-color: color-mix(in srgb, var(--technical-color) 25%, transparent);
+.highlight[data-personas="technical"],
+.tab-panel[id="technical"] .highlight { 
+    background-color: color-mix(in srgb, var(--technical-color) 40%, transparent);
     border: 1px solid var(--technical-color);
+    box-shadow: 0 1px 3px rgba(126, 211, 33, 0.3);
 }
-.highlight[data-personas="hr"] { 
-    background-color: color-mix(in srgb, var(--hr-color) 25%, transparent);
+.highlight[data-personas="hr"],
+.tab-panel[id="hr"] .highlight { 
+    background-color: color-mix(in srgb, var(--hr-color) 40%, transparent);
     border: 1px solid var(--hr-color);
+    box-shadow: 0 1px 3px rgba(245, 166, 35, 0.3);
 }
-.highlight[data-personas="legal"] { 
-    background-color: color-mix(in srgb, var(--legal-color) 25%, transparent);
+.highlight[data-personas="legal"],
+.tab-panel[id="legal"] .highlight { 
+    background-color: color-mix(in srgb, var(--legal-color) 40%, transparent);
     border: 1px solid var(--legal-color);
+    box-shadow: 0 1px 3px rgba(208, 2, 27, 0.3);
 }
-.highlight[data-personas="junior"] { 
-    background-color: color-mix(in srgb, var(--junior-color) 25%, transparent);
+.highlight[data-personas="junior"],
+.tab-panel[id="junior"] .highlight { 
+    background-color: color-mix(in srgb, var(--junior-color) 40%, transparent);
     border: 1px solid var(--junior-color);
+    box-shadow: 0 1px 3px rgba(144, 19, 254, 0.3);
 }
 
 /* Multi-persona highlights */
@@ -345,16 +359,17 @@ h2 {
     border: 2px solid;
     animation: stripe-flow 1s linear infinite;
     background-size: 20px 20px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
 
 /* Diagonal stripes for specific combinations */
 .highlight[data-personas="management,technical"] {
     background: repeating-linear-gradient(
         45deg,
-        color-mix(in srgb, var(--management-color) 30%, transparent),
-        color-mix(in srgb, var(--management-color) 30%, transparent) 10px,
-        color-mix(in srgb, var(--technical-color) 30%, transparent) 10px,
-        color-mix(in srgb, var(--technical-color) 30%, transparent) 20px
+        color-mix(in srgb, var(--management-color) 45%, transparent),
+        color-mix(in srgb, var(--management-color) 45%, transparent) 10px,
+        color-mix(in srgb, var(--technical-color) 45%, transparent) 10px,
+        color-mix(in srgb, var(--technical-color) 45%, transparent) 20px
     );
     border-image: linear-gradient(45deg, var(--management-color), var(--technical-color)) 1;
 }
@@ -362,10 +377,10 @@ h2 {
 .highlight[data-personas="management,hr"] {
     background: repeating-linear-gradient(
         45deg,
-        color-mix(in srgb, var(--management-color) 30%, transparent),
-        color-mix(in srgb, var(--management-color) 30%, transparent) 10px,
-        color-mix(in srgb, var(--hr-color) 30%, transparent) 10px,
-        color-mix(in srgb, var(--hr-color) 30%, transparent) 20px
+        color-mix(in srgb, var(--management-color) 45%, transparent),
+        color-mix(in srgb, var(--management-color) 45%, transparent) 10px,
+        color-mix(in srgb, var(--hr-color) 45%, transparent) 10px,
+        color-mix(in srgb, var(--hr-color) 45%, transparent) 20px
     );
     border-image: linear-gradient(45deg, var(--management-color), var(--hr-color)) 1;
 }
@@ -373,10 +388,10 @@ h2 {
 .highlight[data-personas="technical,hr"] {
     background: repeating-linear-gradient(
         45deg,
-        color-mix(in srgb, var(--technical-color) 30%, transparent),
-        color-mix(in srgb, var(--technical-color) 30%, transparent) 10px,
-        color-mix(in srgb, var(--hr-color) 30%, transparent) 10px,
-        color-mix(in srgb, var(--hr-color) 30%, transparent) 20px
+        color-mix(in srgb, var(--technical-color) 45%, transparent),
+        color-mix(in srgb, var(--technical-color) 45%, transparent) 10px,
+        color-mix(in srgb, var(--hr-color) 45%, transparent) 10px,
+        color-mix(in srgb, var(--hr-color) 45%, transparent) 20px
     );
     border-image: linear-gradient(45deg, var(--technical-color), var(--hr-color)) 1;
 }
@@ -394,11 +409,19 @@ h2 {
 /* Comment Styles */
 .comment {
     padding: 10px;
-    margin: 10px 0;
+    margin: 5px 0;
     background: white;
     border-radius: 4px;
     border-left: 4px solid;
     cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    scroll-margin-top: 15px;
+}
+
+.comment:hover {
+    transform: translateX(2px);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .comment.management { border-color: var(--management-color); }
@@ -409,6 +432,74 @@ h2 {
 
 .comment.active {
     box-shadow: 0 0 0 2px currentColor;
+    transform: translateX(4px);
+}
+
+/* Ensure comments align with their highlighted text - only in persona tabs */
+.tab-panel:not(#all) .snippet-comments-content {
+    position: relative;
+    padding-right: 10px;
+}
+
+.tab-panel:not(#all) .comment[data-offset] {
+    position: absolute;
+    width: calc(100% - 10px);
+    left: 0;
+}
+
+/* All page specific styles */
+#all .feedback-view {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    gap: 15px;
+}
+
+#all .feedback-header {
+    margin-bottom: 0;
+}
+
+#all .all-feedback-container {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    gap: 20px;
+}
+
+#all .feedback-sidebar {
+    width: 300px;
+    overflow-y: auto;
+    max-height: none;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    background: #f9f9f9;
+    padding: 15px;
+    border-radius: 4px;
+}
+
+#all .snippet-comments-content {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+#all .document-view {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    background: white;
+    padding: 20px;
+    border-radius: 4px;
+}
+
+#all .document-content {
+    flex: 1;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    line-height: 1.6;
 }
 
 /* All Feedback View */

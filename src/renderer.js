@@ -539,47 +539,101 @@ function updateAllFeedbackView() {
         }
     }
 
-    // Create text with highlights
-    let result = currentText;
-    const comments = [];
-
+    // Collect all highlights and find overlapping regions
+    const regions = [];
     for (const [persona, feedback] of Object.entries(feedbackData)) {
         if (!feedback.snippetFeedback) continue;
-
-        const sortedSnippets = feedback.snippetFeedback
-            .map(({ snippet, comment }) => ({
-                snippet,
-                comment,
-                index: currentText.indexOf(snippet)
-            }))
-            .filter(item => item.index !== -1)
-            .sort((a, b) => b.index - a.index);
-
-        sortedSnippets.forEach(({ snippet, comment, index }) => {
-            const before = result.substring(0, index);
-            const after = result.substring(index + snippet.length);
-            result = `${before}<span class="highlight ${persona}" data-comment-id="${persona}-${index}">${snippet}</span>${after}`;
-
-            comments.push({
-                persona,
-                comment,
-                snippet,
-                index
-            });
+        
+        feedback.snippetFeedback.forEach(({ snippet, comment }) => {
+            const index = currentText.indexOf(snippet);
+            if (index !== -1) {
+                // Check for existing overlapping regions
+                let overlapped = false;
+                for (const region of regions) {
+                    // Check if this snippet overlaps with an existing region
+                    if (index < region.end && region.start < (index + snippet.length)) {
+                        // Extend region boundaries if needed
+                        region.start = Math.min(region.start, index);
+                        region.end = Math.max(region.end, index + snippet.length);
+                        // Add the new persona and comment if not already present
+                        if (!region.personas.includes(persona)) {
+                            region.personas.push(persona);
+                        }
+                        region.comments.push({ persona, comment });
+                        // Update the snippet to cover the entire region
+                        region.snippet = currentText.substring(region.start, region.end);
+                        overlapped = true;
+                        break;
+                    }
+                }
+                
+                // If no overlap found, create new region
+                if (!overlapped) {
+                    regions.push({
+                        start: index,
+                        end: index + snippet.length,
+                        personas: [persona],
+                        snippet,
+                        comments: [{ persona, comment }]
+                    });
+                }
+            }
         });
+    }
+
+    // Sort regions by start position
+    regions.sort((a, b) => a.start - b.start);
+
+    // Build the result text with all highlights
+    let result = '';
+    let currentPosition = 0;
+
+    regions.forEach(region => {
+        // Add text before this highlight
+        if (region.start > currentPosition) {
+            result += currentText.substring(currentPosition, region.start);
+        }
+
+        // Sort personas for consistent class names and data attribute
+        const personaList = region.personas.sort().join(',');
+        const highlightId = `${personaList}-${region.start}`;
+
+        // Add the highlighted text with data-personas attribute
+        result += `<span class="highlight" 
+            data-personas="${personaList}" 
+            data-comment-id="${highlightId}"
+            data-comments='${JSON.stringify(region.comments)}'
+        >${region.snippet}</span>`;
+
+        currentPosition = region.end;
+    });
+
+    // Add any remaining text
+    if (currentPosition < currentText.length) {
+        result += currentText.substring(currentPosition);
     }
 
     documentContent.innerHTML = result;
 
-    comments.sort((a, b) => a.index - b.index).forEach(({ persona, comment, snippet, index }) => {
-        const commentEl = document.createElement('div');
-        commentEl.className = `comment ${persona}`;
-        commentEl.setAttribute('data-highlight-id', `${persona}-${index}`);
-        commentEl.innerHTML = `
-            <div class="comment-text">${comment}</div>
-            <div class="snippet-preview">"${snippet}"</div>
-        `;
-        snippetCommentsContent.appendChild(commentEl);
+    // Add comments for all regions
+    regions.forEach(region => {
+        region.comments.forEach(({ persona, comment }) => {
+            const personaList = region.personas.sort().join(',');
+            const highlightId = `${personaList}-${region.start}`;
+            const commentEl = document.createElement('div');
+            commentEl.className = `comment ${persona}`;
+            commentEl.setAttribute('data-highlight-id', highlightId);
+            commentEl.innerHTML = `
+                <div class="comment-text">${comment}</div>
+                <div class="snippet-preview">"${region.snippet}"</div>
+                ${region.personas.length > 1 ? `
+                    <div class="overlap-info">
+                        <small>Part of overlapping feedback from: ${region.personas.map(p => PERSONAS[p]).join(', ')}</small>
+                    </div>
+                ` : ''}
+            `;
+            snippetCommentsContent.appendChild(commentEl);
+        });
     });
 
     setupAllFeedbackInteractions();

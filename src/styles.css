@@ -305,35 +305,85 @@ h2 {
 .highlight {
     border-radius: 2px;
     cursor: pointer;
-    transition: opacity 0.2s ease;
+    transition: all 0.2s ease;
     border: 1px solid transparent;
     position: relative;
     z-index: 1;
+    padding: 2px 0;
 }
 
 .highlight:hover {
     z-index: 2;
+    filter: brightness(1.2);
+    transform: scale(1.01);
 }
 
-.highlight.management { 
-    background-color: color-mix(in srgb, var(--management-color) 15%, transparent);
-    border-color: color-mix(in srgb, var(--management-color) 50%, transparent);
+/* Single persona highlights */
+.highlight[data-personas="management"] { 
+    background-color: color-mix(in srgb, var(--management-color) 25%, transparent);
+    border: 1px solid var(--management-color);
 }
-.highlight.technical { 
-    background-color: color-mix(in srgb, var(--technical-color) 15%, transparent);
-    border-color: color-mix(in srgb, var(--technical-color) 50%, transparent);
+.highlight[data-personas="technical"] { 
+    background-color: color-mix(in srgb, var(--technical-color) 25%, transparent);
+    border: 1px solid var(--technical-color);
 }
-.highlight.hr { 
-    background-color: color-mix(in srgb, var(--hr-color) 15%, transparent);
-    border-color: color-mix(in srgb, var(--hr-color) 50%, transparent);
+.highlight[data-personas="hr"] { 
+    background-color: color-mix(in srgb, var(--hr-color) 25%, transparent);
+    border: 1px solid var(--hr-color);
 }
-.highlight.legal { 
-    background-color: color-mix(in srgb, var(--legal-color) 15%, transparent);
-    border-color: color-mix(in srgb, var(--legal-color) 50%, transparent);
+.highlight[data-personas="legal"] { 
+    background-color: color-mix(in srgb, var(--legal-color) 25%, transparent);
+    border: 1px solid var(--legal-color);
 }
-.highlight.junior { 
-    background-color: color-mix(in srgb, var(--junior-color) 15%, transparent);
-    border-color: color-mix(in srgb, var(--junior-color) 50%, transparent);
+.highlight[data-personas="junior"] { 
+    background-color: color-mix(in srgb, var(--junior-color) 25%, transparent);
+    border: 1px solid var(--junior-color);
+}
+
+/* Multi-persona highlights */
+.highlight[data-personas*=","] {
+    border: 2px solid;
+    animation: stripe-flow 1s linear infinite;
+    background-size: 20px 20px;
+}
+
+/* Diagonal stripes for specific combinations */
+.highlight[data-personas="management,technical"] {
+    background: repeating-linear-gradient(
+        45deg,
+        color-mix(in srgb, var(--management-color) 30%, transparent),
+        color-mix(in srgb, var(--management-color) 30%, transparent) 10px,
+        color-mix(in srgb, var(--technical-color) 30%, transparent) 10px,
+        color-mix(in srgb, var(--technical-color) 30%, transparent) 20px
+    );
+    border-image: linear-gradient(45deg, var(--management-color), var(--technical-color)) 1;
+}
+
+.highlight[data-personas="management,hr"] {
+    background: repeating-linear-gradient(
+        45deg,
+        color-mix(in srgb, var(--management-color) 30%, transparent),
+        color-mix(in srgb, var(--management-color) 30%, transparent) 10px,
+        color-mix(in srgb, var(--hr-color) 30%, transparent) 10px,
+        color-mix(in srgb, var(--hr-color) 30%, transparent) 20px
+    );
+    border-image: linear-gradient(45deg, var(--management-color), var(--hr-color)) 1;
+}
+
+.highlight[data-personas="technical,hr"] {
+    background: repeating-linear-gradient(
+        45deg,
+        color-mix(in srgb, var(--technical-color) 30%, transparent),
+        color-mix(in srgb, var(--technical-color) 30%, transparent) 10px,
+        color-mix(in srgb, var(--hr-color) 30%, transparent) 10px,
+        color-mix(in srgb, var(--hr-color) 30%, transparent) 20px
+    );
+    border-image: linear-gradient(45deg, var(--technical-color), var(--hr-color)) 1;
+}
+
+@keyframes stripe-flow {
+    0% { background-position: 0 0; }
+    100% { background-position: 20px 0; }
 }
 
 .highlight.active {

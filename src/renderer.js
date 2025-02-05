@@ -300,9 +300,13 @@ function createFeedbackDisplay(feedback, persona, rawResponse = null) {
     // Setup debug button
     const debugBtn = panel.querySelector('.debug-btn');
     if (debugBtn) {
-        debugBtn.addEventListener('click', () => {
+        // Remove any existing listeners
+        const newDebugBtn = debugBtn.cloneNode(true);
+        debugBtn.parentNode.replaceChild(newDebugBtn, debugBtn);
+        
+        newDebugBtn.addEventListener('click', () => {
             debugMode[persona] = !debugMode[persona];
-            debugBtn.textContent = debugMode[persona] ? 'Hide Debug Info' : 'Show Debug Info';
+            newDebugBtn.textContent = debugMode[persona] ? 'Hide Debug Info' : 'Show Debug Info';
             
             // Toggle debug info display
             const existingDebug = panel.querySelector('.debug-info');
@@ -404,8 +408,8 @@ function createFeedbackDisplay(feedback, persona, rawResponse = null) {
         scoresContent.innerHTML += `
             <div class="score-bar">
                 <div class="score-label">
-                    <span>${criterion.charAt(0).toUpperCase() + criterion.slice(1)}</span>
-                    <span>${score}/100</span>
+                    <span class="criterion-name">${criterion.charAt(0).toUpperCase() + criterion.slice(1)}</span>
+                    <span class="criterion-value">${score}%</span>
                 </div>
                 <div class="score-progress">
                     <div class="score-fill ${scoreClass}" style="width: ${score}%"></div>
@@ -414,7 +418,7 @@ function createFeedbackDisplay(feedback, persona, rawResponse = null) {
         `;
     }
 
-    // Add general comments
+    // Add general comments with count
     generalCommentsContent.innerHTML = '';
     if (feedback.generalComments) {
         feedback.generalComments.forEach(comment => {
@@ -423,6 +427,15 @@ function createFeedbackDisplay(feedback, persona, rawResponse = null) {
             commentEl.textContent = comment;
             generalCommentsContent.appendChild(commentEl);
         });
+    }
+
+    // Update specific feedback count
+    const snippetCommentsTitle = panel.querySelector('.snippet-comments h3');
+    if (snippetCommentsTitle && feedback.snippetFeedback) {
+        const validSnippets = feedback.snippetFeedback
+            .filter(({ snippet }) => currentText.indexOf(snippet) !== -1);
+        const count = validSnippets.length;
+        snippetCommentsTitle.innerHTML = `Specific Feedback <span class="comment-count">(${count} comments)</span>`;
     }
 
     // Setup interactions with smooth scrolling
@@ -502,9 +515,13 @@ function updateAllFeedbackView() {
 
     // Setup debug button for all tab
     if (debugBtn) {
-        debugBtn.addEventListener('click', () => {
+        // Remove any existing listeners
+        const newDebugBtn = debugBtn.cloneNode(true);
+        debugBtn.parentNode.replaceChild(newDebugBtn, debugBtn);
+        
+        newDebugBtn.addEventListener('click', () => {
             debugMode.all = !debugMode.all;
-            debugBtn.textContent = debugMode.all ? 'Hide Debug Info' : 'Show Debug Info';
+            newDebugBtn.textContent = debugMode.all ? 'Hide Debug Info' : 'Show Debug Info';
             
             const existingDebug = panel.querySelector('.debug-info');
             if (debugMode.all) {
@@ -636,15 +653,28 @@ function updateAllFeedbackView() {
 
     setupAllFeedbackInteractions();
 
+    // Group general comments by persona in All tab
+    const personaGroups = {};
     Object.entries(feedbackData).forEach(([persona, feedback]) => {
-        if (feedback.generalComments) {
-            feedback.generalComments.forEach(comment => {
-                const commentEl = document.createElement('div');
-                commentEl.className = `comment ${persona}`;
-                commentEl.textContent = comment;
-                generalCommentsContent.appendChild(commentEl);
-            });
+        if (feedback.generalComments && feedback.generalComments.length > 0) {
+            personaGroups[persona] = feedback.generalComments;
         }
+    });
+
+    Object.entries(personaGroups).forEach(([persona, comments]) => {
+        // Add persona header
+        const headerEl = document.createElement('div');
+        headerEl.className = `persona-header ${persona}`;
+        headerEl.textContent = PERSONAS[persona];
+        generalCommentsContent.appendChild(headerEl);
+
+        // Add comments for this persona
+        comments.forEach(comment => {
+            const commentEl = document.createElement('div');
+            commentEl.className = `comment ${persona}`;
+            commentEl.textContent = comment;
+            generalCommentsContent.appendChild(commentEl);
+        });
     });
 
     // Restore filter states

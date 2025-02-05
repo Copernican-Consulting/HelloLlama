@@ -281,8 +281,10 @@ function setupSubmitHandlers() {
                     let errorMessage;
                     if (error.message.includes('timeout')) {
                         errorMessage = `${PERSONAS[persona]} was in a meeting.`;
-                    } else if (error.message.includes('JSON')) {
+                    } else if (error.message.includes('JSON') || error.message.includes('Unexpected')) {
                         errorMessage = `I can't understand ${PERSONAS[persona]}'s feedback.`;
+                    } else if (error.message.includes('ECONNREFUSED') || error.message.includes('ECONNRESET')) {
+                        errorMessage = `${PERSONAS[persona]} was in a meeting.`;
                     } else {
                         errorMessage = 'Error processing text: ' + error.message;
                     }
@@ -290,7 +292,10 @@ function setupSubmitHandlers() {
                     // Show error with retry button
                     const errorContainer = document.createElement('div');
                     errorContainer.className = 'error-message';
-                    errorContainer.textContent = errorMessage;
+                    const messageEl = document.createElement('div');
+                    messageEl.textContent = errorMessage;
+                    messageEl.style.marginBottom = '10px';
+                    errorContainer.appendChild(messageEl);
                     errorContainer.appendChild(retryBtn);
                     
                     // Add retry functionality
@@ -838,9 +843,15 @@ function setupAllFeedbackInteractions() {
                 comment.setAttribute('data-linked', 'true');
             });
             
-            // Scroll to the first comment
-            if (comments.length > 0) {
-                comments[0].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            // Find the first visible comment
+            const visibleComments = Array.from(comments).filter(comment => 
+                comment.style.display !== 'none'
+            );
+            
+            // Scroll to the first visible comment
+            if (visibleComments.length > 0) {
+                const comment = visibleComments[0];
+                comment.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
         });
     });
@@ -858,26 +869,6 @@ function setupAllFeedbackInteractions() {
             });
             
             // Activate comment and highlight
-            comment.classList.add('active');
-            comment.setAttribute('data-linked', 'true');
-            if (highlight) {
-                highlight.classList.add('active');
-                highlight.setAttribute('data-linked', 'true');
-                highlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-        });
-    });
-
-    document.querySelectorAll('.snippet-comments-content .comment').forEach(comment => {
-        comment.addEventListener('click', () => {
-            const highlightId = comment.dataset.highlightId;
-            const highlight = document.querySelector(`.highlight[data-comment-id="${highlightId}"]`);
-            
-            document.querySelectorAll('.highlight.active, .comment.active').forEach(el => {
-                el.classList.remove('active');
-                el.removeAttribute('data-linked');
-            });
-            
             comment.classList.add('active');
             comment.setAttribute('data-linked', 'true');
             if (highlight) {

@@ -576,21 +576,22 @@ h2 {
 #all .all-feedback-container {
     flex: 1;
     min-height: 0;
-    overflow: hidden;
     display: flex;
     gap: 20px;
+    overflow-y: auto;
+    padding-right: 10px;
 }
 
 #all .feedback-sidebar {
     width: 300px;
-    overflow-y: visible;
-    max-height: none;
     display: flex;
     flex-direction: column;
     gap: 20px;
     background: #f9f9f9;
     padding: 15px;
     border-radius: 4px;
+    position: sticky;
+    top: 0;
 }
 
 #all .snippet-comments-content {
@@ -602,17 +603,16 @@ h2 {
 
 #all .document-view {
     flex: 1;
-    overflow: hidden;
     display: flex;
     flex-direction: column;
     background: white;
     padding: 20px;
     border-radius: 4px;
+    overflow: visible;
 }
 
 #all .document-content {
     flex: 1;
-    overflow-y: auto;
     white-space: pre-wrap;
     line-height: 1.6;
 }

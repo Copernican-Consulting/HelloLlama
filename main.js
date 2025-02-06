@@ -1,6 +1,8 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const fetch = require('node-fetch');
+const pdfParse = require('pdf-parse');
+const fs = require('fs');
 require('@electron/remote/main').initialize();
 
 function createWindow() {
@@ -11,12 +13,26 @@ function createWindow() {
             nodeIntegration: true,
             contextIsolation: false,
             enableRemoteModule: true
-        }
-    });
+    }
+});
 
     win.loadFile('src/index.html');
     require("@electron/remote/main").enable(win.webContents);
 }
+
+ipcMain.handle('parse-pdf', async (event, pdfBuffer) => {
+    try {
+        const buffer = Buffer.from(new Uint8Array(pdfBuffer));
+        const pdfData = await pdfParse(buffer);
+        if (!pdfData || !pdfData.text) {
+            throw new Error('No text content found in PDF');
+        }
+        return pdfData.text;
+    } catch (error) {
+        console.error('PDF parsing error in main.js:', error);
+        return { error: error.message }; // Return error message to renderer
+    }
+});
 
 app.whenReady().then(() => {
     createWindow();

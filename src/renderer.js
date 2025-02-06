@@ -1,7 +1,5 @@
 const { ipcRenderer } = require('electron');
-const pdfParse = require('pdf-parse');
 const mammoth = require('mammoth');
-const fs = require('fs');
 
 // DOM Elements
 const settingsBtn = document.getElementById('settingsBtn');
@@ -149,11 +147,11 @@ function setupFileUploadHandlers() {
                     case 'pdf':
                         try {
                             showError(panel, 'Reading PDF file...');
-                            
+
                             const pdfBuffer = await new Promise((resolve, reject) => {
                                 const reader = new FileReader();
                                 reader.onload = (e) => {
-                                    showError(panel, 'PDF file loaded, preparing to parse...');
+                                    showError(panel, 'PDF file loaded, preparing to send to main process...');
                                     resolve(e.target.result);
                                 };
                                 reader.onerror = (e) => {
@@ -162,20 +160,17 @@ function setupFileUploadHandlers() {
                                 };
                                 reader.readAsArrayBuffer(file);
                             });
-                            
-                            showError(panel, 'Converting file data...');
-                            const buffer = Buffer.from(new Uint8Array(pdfBuffer));
-                            
-                            showError(panel, 'Parsing PDF content...');
-                            const pdfData = await pdfParse(buffer);
-                            
-                            if (!pdfData || !pdfData.text) {
-                                throw new Error('No text content found in PDF');
+
+                            showError(panel, 'Sending file data to main process...');
+                            const result = await ipcRenderer.invoke('parse-pdf', pdfBuffer);
+
+                            if (result.error) {
+                                throw new Error(result.error);
                             }
-                            
-                            showError(panel, `PDF parsed successfully: ${pdfData.numpages} pages`);
-                            text = pdfData.text;
-                            
+
+                            showError(panel, `PDF parsed successfully`);
+                            text = result;
+
                         } catch (error) {
                             console.error('PDF parsing error:', {
                                 error: error.message,

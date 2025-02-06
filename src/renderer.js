@@ -555,10 +555,10 @@ function createFeedbackDisplay(feedback, persona, rawResponse = null) {
             <div class="score-bar">
                 <div class="score-label">
                     <span class="criterion-name">${criterion.charAt(0).toUpperCase() + criterion.slice(1)}</span>
-                    <span class="criterion-value">${score}%</span>
                 </div>
                 <div class="score-progress">
                     <div class="score-fill ${scoreClass}" style="width: ${score}%"></div>
+                    <div class="score-value">${score}%</div>
                 </div>
             </div>
         `;

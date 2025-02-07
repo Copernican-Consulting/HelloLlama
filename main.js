@@ -1,9 +1,54 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fetch = require('node-fetch');
 const pdfParse = require('pdf-parse');
 const fs = require('fs');
+const { execSync, spawn } = require('child_process');
 require('@electron/remote/main').initialize();
+
+async function checkOllamaService() {
+    try {
+        await fetch('http://localhost:11434/api/tags');
+        return true;
+    } catch (error) {
+        return false;
+    }
+}
+
+async function ensureOllamaRunning() {
+    const isRunning = await checkOllamaService();
+    if (!isRunning) {
+        await dialog.showErrorBox(
+            'Ollama Not Running',
+            'Ollama service is not running. Please start the Ollama service and try again.'
+        );
+        app.quit();
+        return;
+    }
+
+    // Check if llama3 model is available
+    try {
+        const response = await fetch('http://localhost:11434/api/tags');
+        const data = await response.json();
+        const hasLlama3 = data.models.some(model => model.name.startsWith('llama3:'));
+        if (!hasLlama3) {
+            await dialog.showErrorBox(
+                'Model Not Found',
+                'The llama3 model is not installed. Please run "ollama pull llama3:latest" to install it.'
+            );
+            app.quit();
+            return;
+        }
+    } catch (error) {
+        console.error('Error checking models:', error);
+        await dialog.showErrorBox(
+            'Error',
+            'Failed to check available models. Please ensure Ollama is running correctly.'
+        );
+        app.quit();
+        return;
+    }
+}
 
 function createWindow() {
     const win = new BrowserWindow({
@@ -34,11 +79,13 @@ ipcMain.handle('parse-pdf', async (event, pdfBuffer) => {
     }
 });
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+    await ensureOllamaRunning();
     createWindow();
 
-    app.on('activate', () => {
+    app.on('activate', async () => {
         if (BrowserWindow.getAllWindows().length === 0) {
+            await ensureOllamaRunning();
             createWindow();
         }
     });

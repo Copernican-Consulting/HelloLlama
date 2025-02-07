@@ -35,9 +35,30 @@ RequestExecutionLevel admin
 
 !insertmacro MUI_LANGUAGE "English"
 
+# Logging function
+!define LogMessage "!insertmacro LogMessage"
+!macro LogMessage text
+    FileOpen $9 "$TEMP\HelloLlama_Install.log" a
+    FileSeek $9 0 END
+    # Get timestamp using PowerShell
+    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "Get-Date -Format ''[yyyy-MM-dd HH:mm:ss]''"'
+    Pop $R0
+    Pop $R1
+    FileWrite $9 "$R1${text}$\r$\n"
+    FileClose $9
+    DetailPrint "${text}"
+!macroend
+
 Section "MainSection" SEC01
     SetOutPath "$INSTDIR"
     SetAutoClose false
+    
+    # Initialize log file
+    FileOpen $9 "$TEMP\HelloLlama_Install.log" w
+    FileWrite $9 "Hello Llama Installation Log$\r$\n"
+    FileWrite $9 "==========================$\r$\n"
+    FileClose $9
+    ${LogMessage} "Installation started"
     
     # Step 1: Install Node.js first
     DetailPrint "Downloading and installing Node.js..."
@@ -118,64 +139,95 @@ Section "MainSection" SEC01
         ClearErrors
         
         # Run installer with explicit admin privileges and wait
-        DetailPrint "Running Ollama installer with admin privileges..."
-        ExecWait '"$TEMP\ollama-installer.exe" /S' $0
-        Pop $0 # Return value
-        Pop $1 # Output
+    DetailPrint "Running Ollama installer with admin privileges..."
+    ${LogMessage} "Executing Ollama installer: $TEMP\ollama-installer.exe /S"
+    ExecWait '"$TEMP\ollama-installer.exe" /S' $0
+    ${LogMessage} "Ollama installer exit code: $0"
         
-        ${If} ${Errors} 
-            MessageBox MB_OK|MB_ICONSTOP "Error during Ollama installation: $1"
-            Delete "$TEMP\ollama-installer.exe"
-            Abort
-        ${EndIf}
-        
-        ${If} $0 != 0
-            MessageBox MB_OK|MB_ICONSTOP "Ollama installation failed (Error code: $0). Details: $1"
-            Delete "$TEMP\ollama-installer.exe"
-            Abort
-        ${EndIf}
+    ${If} ${Errors} 
+        ${LogMessage} "Error during Ollama installation"
+        MessageBox MB_OK|MB_ICONSTOP "Error during Ollama installation. Check log file at: $TEMP\HelloLlama_Install.log"
+        Delete "$TEMP\ollama-installer.exe"
+        Abort
+    ${EndIf}
+    
+    ${If} $0 != 0
+        ${LogMessage} "Ollama installation failed with exit code: $0"
+        MessageBox MB_OK|MB_ICONSTOP "Ollama installation failed. Check log file at: $TEMP\HelloLlama_Install.log"
+        Delete "$TEMP\ollama-installer.exe"
+        Abort
+    ${EndIf}
         
         Delete "$TEMP\ollama-installer.exe"
         
-        # Give more time for installation to complete
-        DetailPrint "Waiting for Ollama installation to complete..."
-        Sleep 15000
+    # Give more time for installation to complete
+    DetailPrint "Waiting for Ollama installation to complete..."
+    ${LogMessage} "Waiting 15 seconds for Ollama installation to complete"
+    Sleep 15000
+    
+    # Log system state
+    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "Get-Service | Where-Object {$_.Name -like ''*ollama*''} | Format-List"'
+    Pop $0
+    Pop $1
+    ${LogMessage} "Service state after installation:$\r$\n$1"
     ${EndIf}
     
     # Verify installation
     DetailPrint "Verifying Ollama installation..."
     
     # Check if Ollama service exists and get its status
+    ${LogMessage} "Checking Ollama service existence"
     ClearErrors
-    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "Get-Service ollama -ErrorAction Stop | Out-Null; exit 0"'
+    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "Get-Service ollama -ErrorAction Stop | Format-List"'
     Pop $0 # Return value
     Pop $1 # Output
+    ${LogMessage} "Service check result:$\r$\n$1"
     
     ${If} ${Errors} 
-        MessageBox MB_OK|MB_ICONSTOP "Ollama service not found after installation"
+        ${LogMessage} "Ollama service not found after installation"
+        MessageBox MB_OK|MB_ICONSTOP "Ollama service not found after installation. Check log file at: $TEMP\HelloLlama_Install.log"
         Abort
     ${EndIf}
     
     # Try to start the service if it's not running
     DetailPrint "Starting Ollama service..."
+    ${LogMessage} "Attempting to start Ollama service"
     ClearErrors
-    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "Start-Service ollama -ErrorAction Stop; exit 0"'
+    
+    # Get service status before starting
+    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "Get-Service ollama | Format-List Status, StartType"'
+    Pop $0
+    Pop $1
+    ${LogMessage} "Service status before start:$\r$\n$1"
+    
+    # Try to start the service
+    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "Start-Service ollama -ErrorAction Stop; Get-Service ollama | Format-List Status, StartType; exit 0"'
     Pop $0 # Return value
     Pop $1 # Output
+    ${LogMessage} "Start-Service result:$\r$\n$1"
     
     ${If} ${Errors} 
-        MessageBox MB_OK|MB_ICONSTOP "Failed to start Ollama service"
+        ${LogMessage} "Failed to start Ollama service with error"
+        MessageBox MB_OK|MB_ICONSTOP "Failed to start Ollama service. Check log file at: $TEMP\HelloLlama_Install.log"
         Abort
     ${EndIf}
     
     ${If} $0 != 0
-        MessageBox MB_OK|MB_ICONSTOP "Failed to start Ollama service (Error code: $0)"
+        ${LogMessage} "Failed to start Ollama service with exit code: $0"
+        MessageBox MB_OK|MB_ICONSTOP "Failed to start Ollama service. Check log file at: $TEMP\HelloLlama_Install.log"
         Abort
     ${EndIf}
     
     # Wait for service to be fully running and verify it's responding
     DetailPrint "Waiting for Ollama service to start..."
+    ${LogMessage} "Waiting 5 seconds for service to be fully running"
     Sleep 5000
+    
+    # Check service status after waiting
+    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "Get-Service ollama | Format-List Status, StartType"'
+    Pop $0
+    Pop $1
+    ${LogMessage} "Service status after waiting:$\r$\n$1"
     
     # Verify service is responding
     ClearErrors

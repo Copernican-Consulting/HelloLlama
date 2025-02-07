@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
+const isDev = !app.isPackaged;
 const fetch = require('node-fetch');
 const pdfParse = require('pdf-parse');
 const fs = require('fs');
@@ -61,7 +62,12 @@ function createWindow() {
     }
 });
 
-    win.loadFile('src/index.html');
+    // In development, load from src directory
+    // In production, load from installation directory
+    const indexPath = isDev ? 
+        path.join(__dirname, 'src', 'index.html') : 
+        path.join(process.resourcesPath, 'app', 'src', 'index.html');
+    win.loadFile(indexPath);
     require("@electron/remote/main").enable(win.webContents);
 }
 

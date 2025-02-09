@@ -1145,7 +1145,7 @@ function showError(panel, message) {
 
 // Settings management
 const defaultSettings = {
-    model: 'llama2',
+    model: 'llama3:latest',
     contextWindow: 4096,
     timeout: 120,
     stream: true,

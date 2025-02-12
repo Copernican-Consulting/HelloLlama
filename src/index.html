@@ -353,7 +353,16 @@
             </div>
 
             <div class="settings-group">
-                <h3>Persona System Prompts</h3>
+                <h3>System Prompt</h3>
+                <div class="prompt-group system">
+                    <label for="systemPrompt">Base System Prompt:</label>
+                    <textarea id="systemPrompt" class="system-prompt"></textarea>
+                    <button class="reset-prompt" data-prompt="system">Reset to Default</button>
+                </div>
+            </div>
+
+            <div class="settings-group">
+                <h3>Persona-Specific Additions</h3>
                 <div class="prompt-group management">
                     <label for="managementPrompt">Senior Management:</label>
                     <textarea id="managementPrompt" class="system-prompt" data-persona="management"></textarea>

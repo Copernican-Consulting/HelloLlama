@@ -59,50 +59,37 @@ const PERSONAS = {
 
 let activeTabId = 'documents';
 
-function getDefaultSystemPrompt() {
-    return `Analyze the following document and respond ONLY with a JSON object in this exact format:
-
-{
-    "scores": {
-        "clarity": 85,
-        "tone": 90,
-        "alignment": 75,
-        "efficiency": 80,
-        "completeness": 95
-    },
-    "snippetFeedback": [
-        {
-            "snippet": "paste the exact text you're commenting on here",
-            "comment": "your specific feedback about this text"
-        }
-    ],
-    "generalComments": [
-        "Your first general comment about the document",
-        "Your second general comment if needed"
-    ]
+async function getDefaultSystemPrompt() {
+    try {
+        return await ipcRenderer.invoke('read-prompt', { type: 'systemPrompt', isDefault: true });
+    } catch (error) {
+        console.error('Error reading default system prompt:', error);
+        return '';
+    }
 }
 
-Important rules:
-1. Your entire response must be valid JSON - do not include any text before or after the JSON
-2. All scores must be numbers between 0 and 100
-3. snippetFeedback must contain exact quotes from the document
-4. Do not use line breaks within comment strings
-5. Escape any quotes within strings
-6. Keep snippet selections focused and specific
-7. Provide 2-4 general comments
-8. Include 2-5 snippet feedback items
-
-Remember: Respond ONLY with the JSON object - no other text.`;
+async function getDefaultPersonaPrompt(persona) {
+    try {
+        return await ipcRenderer.invoke('read-prompt', { type: persona, isDefault: true });
+    } catch (error) {
+        console.error('Error reading default persona prompt:', error);
+        return '';
+    }
 }
 
-function getDefaultPersonaPrompt(persona) {
-    return `You are a ${PERSONAS[persona]}.`;
-}
-
-function getDefaultPrompt(persona) {
-    const systemPrompt = localStorage.getItem('systemPrompt') || getDefaultSystemPrompt();
-    const personaPrompt = localStorage.getItem(`${persona}Prompt`) || getDefaultPersonaPrompt(persona);
-    return `${personaPrompt}\n\n${systemPrompt}`;
+async function getPrompt(persona) {
+    try {
+        const [systemPrompt, personaPrompt] = await Promise.all([
+            ipcRenderer.invoke('read-prompt', { type: 'systemPrompt' })
+                .catch(() => ipcRenderer.invoke('read-prompt', { type: 'systemPrompt', isDefault: true })),
+            ipcRenderer.invoke('read-prompt', { type: persona })
+                .catch(() => ipcRenderer.invoke('read-prompt', { type: persona, isDefault: true }))
+        ]);
+        return `${personaPrompt}\n\n${systemPrompt}`;
+    } catch (error) {
+        console.error('Error reading prompts:', error);
+        return '';
+    }
 }
 
 function switchTab(tabId) {
@@ -255,15 +242,14 @@ function setupSubmitHandlers() {
                     inputView.classList.add('hidden');
                     feedbackView.classList.add('hidden');
 
-                    const systemPrompt = document.getElementById('systemPrompt')?.value || getDefaultSystemPrompt();
-                    const personaPrompt = document.getElementById(`${persona}Prompt`)?.value || getDefaultPersonaPrompt(persona);
+                    const systemPrompt = await getPrompt(persona);
                     const currentSettings = {
                         model: modelSelect.value,
                         contextWindow: parseInt(contextWindow.value),
                         timeout: parseInt(timeout.value),
                         stream: false,
                         temperature: parseFloat(temperature.value),
-                        systemPrompt: `${personaPrompt}\n\n${systemPrompt}`,
+                        systemPrompt: systemPrompt,
                         persona: persona
                     };
 
@@ -992,22 +978,30 @@ if (generalCommentsTabs) {
 }
 
 // Initialize prompts
-function initializePrompts() {
+async function initializePrompts() {
     // Initialize system prompt
     const systemPromptElement = document.getElementById('systemPrompt');
     if (systemPromptElement) {
-        const savedSystemPrompt = localStorage.getItem('systemPrompt');
-        systemPromptElement.value = savedSystemPrompt || getDefaultSystemPrompt();
+        try {
+            systemPromptElement.value = await ipcRenderer.invoke('read-prompt', { type: 'systemPrompt' })
+                .catch(() => ipcRenderer.invoke('read-prompt', { type: 'systemPrompt', isDefault: true }));
+        } catch (error) {
+            console.error('Error initializing system prompt:', error);
+        }
     }
 
     // Initialize persona prompts
-    Object.keys(PERSONAS).forEach(persona => {
+    for (const persona of Object.keys(PERSONAS)) {
         const promptElement = document.getElementById(`${persona}Prompt`);
         if (promptElement) {
-            const savedPrompt = localStorage.getItem(`${persona}Prompt`);
-            promptElement.value = savedPrompt || getDefaultPersonaPrompt(persona);
+            try {
+                promptElement.value = await ipcRenderer.invoke('read-prompt', { type: persona })
+                    .catch(() => ipcRenderer.invoke('read-prompt', { type: persona, isDefault: true }));
+            } catch (error) {
+                console.error(`Error initializing ${persona} prompt:`, error);
+            }
         }
-    });
+    }
 }
 
 // Save prompts
@@ -1015,34 +1009,60 @@ function setupPromptHandlers() {
     // Handle system prompt
     const systemPromptElement = document.getElementById('systemPrompt');
     if (systemPromptElement) {
-        systemPromptElement.addEventListener('change', () => {
-            localStorage.setItem('systemPrompt', systemPromptElement.value);
+        systemPromptElement.addEventListener('change', async () => {
+            try {
+                await ipcRenderer.invoke('write-prompt', {
+                    type: 'systemPrompt',
+                    content: systemPromptElement.value
+                });
+            } catch (error) {
+                console.error('Error saving system prompt:', error);
+            }
         });
     }
 
     // Handle persona prompts
     document.querySelectorAll('.system-prompt[data-persona]').forEach(prompt => {
-        prompt.addEventListener('change', () => {
-            localStorage.setItem(`${prompt.dataset.persona}Prompt`, prompt.value);
+        prompt.addEventListener('change', async () => {
+            try {
+                await ipcRenderer.invoke('write-prompt', {
+                    type: prompt.dataset.persona,
+                    content: prompt.value
+                });
+            } catch (error) {
+                console.error(`Error saving ${prompt.dataset.persona} prompt:`, error);
+            }
         });
     });
 
     // Handle reset buttons
     document.querySelectorAll('.reset-prompt').forEach(button => {
-        button.addEventListener('click', () => {
-            if (button.dataset.prompt === 'system') {
-                const systemPromptElement = document.getElementById('systemPrompt');
-                if (systemPromptElement) {
-                    systemPromptElement.value = getDefaultSystemPrompt();
-                    localStorage.setItem('systemPrompt', systemPromptElement.value);
+        button.addEventListener('click', async () => {
+            try {
+                if (button.dataset.prompt === 'system') {
+                    const systemPromptElement = document.getElementById('systemPrompt');
+                    if (systemPromptElement) {
+                        const defaultPrompt = await getDefaultSystemPrompt();
+                        systemPromptElement.value = defaultPrompt;
+                        await ipcRenderer.invoke('write-prompt', {
+                            type: 'systemPrompt',
+                            content: defaultPrompt
+                        });
+                    }
+                } else {
+                    const persona = button.dataset.persona;
+                    const promptElement = document.getElementById(`${persona}Prompt`);
+                    if (promptElement) {
+                        const defaultPrompt = await getDefaultPersonaPrompt(persona);
+                        promptElement.value = defaultPrompt;
+                        await ipcRenderer.invoke('write-prompt', {
+                            type: persona,
+                            content: defaultPrompt
+                        });
+                    }
                 }
-            } else {
-                const persona = button.dataset.persona;
-                const promptElement = document.getElementById(`${persona}Prompt`);
-                if (promptElement) {
-                    promptElement.value = getDefaultPersonaPrompt(persona);
-                    localStorage.setItem(`${persona}Prompt`, promptElement.value);
-                }
+            } catch (error) {
+                console.error('Error resetting prompt:', error);
             }
         });
     });

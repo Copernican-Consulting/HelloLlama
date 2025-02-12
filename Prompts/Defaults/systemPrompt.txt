@@ -1,0 +1,33 @@
+Analyze the following document and respond ONLY with a JSON object in this exact format:
+
+{
+    "scores": {
+        "clarity": 85,
+        "tone": 90,
+        "alignment": 75,
+        "efficiency": 80,
+        "completeness": 95
+    },
+    "snippetFeedback": [
+        {
+            "snippet": "paste the exact text you're commenting on here",
+            "comment": "your specific feedback about this text"
+        }
+    ],
+    "generalComments": [
+        "Your first general comment about the document",
+        "Your second general comment if needed"
+    ]
+}
+
+Important rules:
+1. Your entire response must be valid JSON - do not include any text before or after the JSON
+2. All scores must be numbers between 0 and 100
+3. snippetFeedback must contain exact quotes from the document
+4. Do not use line breaks within comment strings
+5. Escape any quotes within strings
+6. Keep snippet selections focused and specific
+7. Provide 2-4 general comments
+8. Include 2-5 snippet feedback items
+
+Remember: Respond ONLY with the JSON object - no other text.

@@ -3,8 +3,9 @@ const path = require('path');
 const isDev = !app.isPackaged;
 const fetch = require('node-fetch');
 const pdfParse = require('pdf-parse');
-const fs = require('fs');
+const fs = require('fs').promises;
 const { execSync, spawn } = require('child_process');
+const fsSync = require('fs');
 require('@electron/remote/main').initialize();
 
 async function checkOllamaService() {
@@ -85,7 +86,67 @@ ipcMain.handle('parse-pdf', async (event, pdfBuffer) => {
     }
 });
 
+// Ensure prompt directories exist
+async function ensurePromptDirectories() {
+    const dirs = ['Prompts', 'Prompts/Defaults'];
+    for (const dir of dirs) {
+        try {
+            await fs.access(dir);
+        } catch {
+            await fs.mkdir(dir, { recursive: true });
+        }
+    }
+}
+
+// Copy default prompts if user prompts don't exist
+async function ensureUserPrompts() {
+    const prompts = ['systemPrompt', 'management', 'technical', 'hr', 'legal', 'junior'];
+    for (const prompt of prompts) {
+        const userPath = `Prompts/${prompt}.txt`;
+        try {
+            await fs.access(userPath);
+        } catch {
+            const defaultPath = `Prompts/Defaults/${prompt}.txt`;
+            if (fsSync.existsSync(defaultPath)) {
+                await fs.copyFile(defaultPath, userPath);
+            }
+        }
+    }
+}
+
+// Handle reading prompts
+ipcMain.handle('read-prompt', async (event, { type, isDefault = false }) => {
+    try {
+        const dir = isDefault ? 'Prompts/Defaults' : 'Prompts';
+        const content = await fs.readFile(`${dir}/${type}.txt`, 'utf8');
+        return content;
+    } catch (error) {
+        console.error('Error reading prompt:', error);
+        throw error;
+    }
+});
+
+// Handle writing prompts
+ipcMain.handle('write-prompt', async (event, { type, content }) => {
+    try {
+        await fs.writeFile(`Prompts/${type}.txt`, content);
+        return true;
+    } catch (error) {
+        console.error('Error writing prompt:', error);
+        throw error;
+    }
+});
+
+app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') {
+        app.quit();
+    }
+});
+
+// Initialize prompt system when app is ready
 app.whenReady().then(async () => {
+    await ensurePromptDirectories();
+    await ensureUserPrompts();
     await ensureOllamaRunning();
     createWindow();
 
@@ -97,11 +158,6 @@ app.whenReady().then(async () => {
     });
 });
 
-app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') {
-        app.quit();
-    }
-});
 
 // Fetch available models from Ollama
 ipcMain.handle('get-models', async () => {

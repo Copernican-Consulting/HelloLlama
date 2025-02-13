@@ -8,7 +8,13 @@ const mainView = document.getElementById('mainView');
 const settingsView = document.getElementById('settingsView');
 const allFeedbackView = document.getElementById('allFeedbackView');
 const tabsList = document.getElementById('tabsList');
+const apiProvider = document.getElementById('apiProvider');
+const ollamaSettings = document.getElementById('ollamaSettings');
+const openrouterSettings = document.getElementById('openrouterSettings');
 const modelSelect = document.getElementById('modelSelect');
+const openrouterKey = document.getElementById('openrouterKey');
+const openrouterModel = document.getElementById('openrouterModel');
+const openrouterLink = document.getElementById('openrouterLink');
 const contextWindow = document.getElementById('contextWindow');
 const timeout = document.getElementById('timeout');
 const stream = document.getElementById('stream');
@@ -244,7 +250,10 @@ function setupSubmitHandlers() {
 
                     const systemPrompt = await getPrompt(persona);
                     const currentSettings = {
-                        model: modelSelect.value,
+                        apiProvider: apiProvider.value,
+                        ollamaModel: modelSelect.value,
+                        openrouterKey: openrouterKey.value,
+                        openrouterModel: openrouterModel.value,
                         contextWindow: parseInt(contextWindow.value),
                         timeout: parseInt(timeout.value),
                         stream: false,
@@ -1203,7 +1212,10 @@ function showError(panel, message) {
 
 // Settings management
 const defaultSettings = {
-    model: 'llama3:latest',
+    apiProvider: 'ollama',
+    ollamaModel: 'llama3:latest',
+    openrouterKey: '',
+    openrouterModel: 'openai/gpt-3.5-turbo',
     contextWindow: 4096,
     timeout: 120,
     stream: true,
@@ -1213,12 +1225,16 @@ const defaultSettings = {
 
 function loadSettings() {
     const savedSettings = localStorage.getItem('settings');
-    return savedSettings ? JSON.parse(savedSettings) : defaultSettings;
+    const settings = savedSettings ? JSON.parse(savedSettings) : defaultSettings;
+    return { ...defaultSettings, ...settings }; // Ensure all fields exist
 }
 
 function saveSettings() {
     const settings = {
-        model: modelSelect.value,
+        apiProvider: apiProvider.value,
+        ollamaModel: modelSelect.value,
+        openrouterKey: openrouterKey.value,
+        openrouterModel: openrouterModel.value,
         contextWindow: parseInt(contextWindow.value),
         timeout: parseInt(timeout.value),
         stream: stream.checked,
@@ -1231,12 +1247,26 @@ function saveSettings() {
 function applySettings(settings) {
     if (!settings) return;
     
+    if (apiProvider) apiProvider.value = settings.apiProvider;
+    if (modelSelect) modelSelect.value = settings.ollamaModel;
+    if (openrouterKey) openrouterKey.value = settings.openrouterKey;
+    if (openrouterModel) openrouterModel.value = settings.openrouterModel;
     if (contextWindow) contextWindow.value = settings.contextWindow;
     if (timeout) timeout.value = settings.timeout;
     if (stream) stream.checked = settings.stream;
     if (temperature) temperature.value = settings.temperature;
     if (temperatureValue) temperatureValue.textContent = settings.temperature;
     if (seed && settings.seed) seed.value = settings.seed;
+
+    // Show/hide provider settings
+    toggleProviderSettings(settings.apiProvider);
+}
+
+function toggleProviderSettings(provider) {
+    if (ollamaSettings && openrouterSettings) {
+        ollamaSettings.classList.toggle('hidden', provider !== 'ollama');
+        openrouterSettings.classList.toggle('hidden', provider !== 'openrouter');
+    }
 }
 
 // View switching
@@ -1268,18 +1298,18 @@ if (temperature) {
     });
 }
 
-// Load models from Ollama
+// Load Ollama models
 async function loadModels() {
     if (!modelSelect) return;
 
     try {
         const models = await ipcRenderer.invoke('get-models');
         modelSelect.innerHTML = models.map(model => 
-            `<option value="${model.name}" ${model.name === settings.model ? 'selected' : ''}>${model.name}</option>`
+            `<option value="${model.name}" ${model.name === settings.ollamaModel ? 'selected' : ''}>${model.name}</option>`
         ).join('');
     } catch (error) {
-        console.error('Error loading models:', error);
-        modelSelect.innerHTML = `<option value="${settings.model}">${settings.model}</option>`;
+        console.error('Error loading Ollama models:', error);
+        modelSelect.innerHTML = `<option value="${settings.ollamaModel}">${settings.ollamaModel}</option>`;
     }
 }
 
@@ -1335,7 +1365,38 @@ ipcRenderer.on('stream-response', (event, { chunk, persona }) => {
 // Initialize settings and load models
 const settings = loadSettings();
 applySettings(settings);
-loadModels();
+
+// Only load Ollama models if it's the selected provider
+if (settings.apiProvider === 'ollama') {
+    loadModels();
+}
+
+// Setup event listeners for settings
+if (apiProvider) {
+    apiProvider.addEventListener('change', (e) => {
+        toggleProviderSettings(e.target.value);
+        if (e.target.value === 'ollama') {
+            loadModels();
+        }
+        saveSettings();
+    });
+}
+
 if (modelSelect) {
     modelSelect.addEventListener('change', saveSettings);
+}
+
+if (openrouterModel) {
+    openrouterModel.addEventListener('input', saveSettings);
+}
+
+if (openrouterKey) {
+    openrouterKey.addEventListener('input', saveSettings);
+}
+
+if (openrouterLink) {
+    openrouterLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        ipcRenderer.invoke('open-external-url', 'https://openrouter.ai/keys');
+    });
 }

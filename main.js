@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const isDev = !app.isPackaged;
 const fetch = require('node-fetch');
@@ -20,12 +20,8 @@ async function checkOllamaService() {
 async function ensureOllamaRunning() {
     const isRunning = await checkOllamaService();
     if (!isRunning) {
-        await dialog.showErrorBox(
-            'Ollama Not Running',
-            'Ollama service is not running. Please start the Ollama service and try again.'
-        );
-        app.quit();
-        return;
+        console.warn('Ollama service is not running');
+        return false;
     }
 
     // Check if llama3 model is available
@@ -34,21 +30,13 @@ async function ensureOllamaRunning() {
         const data = await response.json();
         const hasLlama3 = data.models.some(model => model.name.startsWith('llama3:'));
         if (!hasLlama3) {
-            await dialog.showErrorBox(
-                'Model Not Found',
-                'The llama3 model is not installed. Please run "ollama pull llama3:latest" to install it.'
-            );
-            app.quit();
-            return;
+            console.warn('llama3 model is not installed');
+            return false;
         }
+        return true;
     } catch (error) {
         console.error('Error checking models:', error);
-        await dialog.showErrorBox(
-            'Error',
-            'Failed to check available models. Please ensure Ollama is running correctly.'
-        );
-        app.quit();
-        return;
+        return false;
     }
 }
 
@@ -147,12 +135,11 @@ app.on('window-all-closed', () => {
 app.whenReady().then(async () => {
     await ensurePromptDirectories();
     await ensureUserPrompts();
-    await ensureOllamaRunning();
+    await ensureOllamaRunning(); // Just check, don't quit if not running
     createWindow();
 
-    app.on('activate', async () => {
+    app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {
-            await ensureOllamaRunning();
             createWindow();
         }
     });
@@ -174,30 +161,67 @@ ipcMain.handle('get-models', async () => {
     }
 });
 
-// Handle text processing with Ollama
+// Handle opening external URLs
+ipcMain.handle('open-external-url', (event, url) => {
+    shell.openExternal(url);
+});
+
+// Handle text processing with either Ollama or OpenRouter
 ipcMain.handle('process-text', async (event, { text, settings }) => {
     try {
-        const response = await fetch('http://localhost:11434/api/generate', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                model: settings.model,
-                prompt: text,
-                system: settings.systemPrompt,
-                context_window: settings.contextWindow,
-                timeout: settings.timeout * 1000, // convert to milliseconds
-                stream: settings.stream,
-                temperature: settings.temperature
-            })
-        });
+        let response;
+        let data;
 
-        const data = await response.json();
+        if (settings.apiProvider === 'ollama') {
+            response = await fetch('http://localhost:11434/api/generate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    model: settings.ollamaModel,
+                    prompt: text,
+                    system: settings.systemPrompt,
+                    context_window: settings.contextWindow,
+                    timeout: settings.timeout * 1000,
+                    stream: settings.stream,
+                    temperature: settings.temperature
+                })
+            });
+            data = await response.json();
+            data = data.response;
+        } else {
+            if (!settings.openrouterKey) {
+                throw new Error('No auth credentials found - please enter your OpenRouter API key in Settings');
+            }
+            response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${settings.openrouterKey}`,
+                    'HTTP-Referer': 'http://localhost:3000',
+                    'X-Title': 'Sideview.AI'
+                },
+                body: JSON.stringify({
+                    model: settings.openrouterModel,
+                    messages: [
+                        { role: "system", content: settings.systemPrompt },
+                        { role: "user", content: text }
+                    ],
+                    temperature: settings.temperature,
+                    max_tokens: settings.contextWindow
+                })
+            });
+            const openRouterResponse = await response.json();
+            if (!response.ok) {
+                throw new Error(openRouterResponse.error?.message || 'OpenRouter API error');
+            }
+            data = openRouterResponse.choices[0].message.content;
+        }
         
         // Validate JSON structure
         try {
-            const parsedResponse = JSON.parse(data.response);
+            const parsedResponse = JSON.parse(data);
             
             // Validate required fields and data types
             if (!parsedResponse.scores || typeof parsedResponse.scores !== 'object') {
@@ -236,7 +260,7 @@ ipcMain.handle('process-text', async (event, { text, settings }) => {
                 }
             });
             
-            return data.response; // Return the original JSON string for parsing in renderer
+            return data; // Return the original JSON string for parsing in renderer
         } catch (parseError) {
             console.error('Invalid response format:', parseError);
             throw new Error(`The model response was not in the correct format: ${parseError.message}`);

@@ -321,8 +321,31 @@
             <h2>Settings</h2>
             
             <div class="settings-group">
-                <label for="modelSelect">Model:</label>
-                <select id="modelSelect"></select>
+                <label for="apiProvider">API Provider:</label>
+                <select id="apiProvider">
+                    <option value="ollama">Ollama</option>
+                    <option value="openrouter">OpenRouter</option>
+                </select>
+            </div>
+
+            <div id="ollamaSettings" class="provider-settings">
+                <div class="settings-group">
+                    <label for="modelSelect">Ollama Model:</label>
+                    <select id="modelSelect"></select>
+                </div>
+            </div>
+
+            <div id="openrouterSettings" class="provider-settings hidden">
+                <div class="settings-group">
+                    <label for="openrouterKey">API Key:</label>
+                    <input type="password" id="openrouterKey">
+                    <span class="setting-help">Get your API key from <a href="#" id="openrouterLink">OpenRouter</a></span>
+                </div>
+                <div class="settings-group">
+                    <label for="openrouterModel">Model:</label>
+                    <input type="text" id="openrouterModel" placeholder="e.g. openai/gpt-4">
+                    <span class="setting-help">Enter the full model name (e.g. openai/gpt-4, anthropic/claude-2)</span>
+                </div>
             </div>
 
             <div class="settings-group">

@@ -46,9 +46,58 @@ RequestExecutionLevel admin
     DetailPrint "${text}"
 !macroend
 
+# Function to backup settings
+Function BackupSettings
+    ${LogMessage} "Backing up application settings..."
+    
+    # Create backup directory
+    CreateDirectory "$TEMP\HelloLlama_Backup"
+    
+    # Check if old settings exist
+    IfFileExists "$APPDATA\HelloLlama\Local Storage\leveldb\*.ldb" 0 NoOldSettings
+        
+    # Backup Local Storage
+    CopyFiles /SILENT "$APPDATA\HelloLlama\Local Storage\leveldb\*.*" "$TEMP\HelloLlama_Backup"
+    ${LogMessage} "Settings backed up successfully"
+    Goto BackupDone
+    
+    NoOldSettings:
+    ${LogMessage} "No existing settings found"
+    
+    BackupDone:
+FunctionEnd
+
+# Function to restore settings
+Function RestoreSettings
+    ${LogMessage} "Restoring application settings..."
+    
+    # Check if we have backed up settings
+    IfFileExists "$TEMP\HelloLlama_Backup\*.ldb" 0 NoBackup
+        
+    # Create directories if they don't exist
+    CreateDirectory "$APPDATA\HelloLlama"
+    CreateDirectory "$APPDATA\HelloLlama\Local Storage"
+    CreateDirectory "$APPDATA\HelloLlama\Local Storage\leveldb"
+        
+    # Restore settings
+    CopyFiles /SILENT "$TEMP\HelloLlama_Backup\*.*" "$APPDATA\HelloLlama\Local Storage\leveldb"
+    ${LogMessage} "Settings restored successfully"
+    Goto RestoreDone
+    
+    NoBackup:
+    ${LogMessage} "No settings backup found"
+    
+    RestoreDone:
+    # Clean up backup
+    RMDir /r "$TEMP\HelloLlama_Backup"
+FunctionEnd
+
 Section "MainSection" SEC01
     SetOutPath "$INSTDIR"
     SetAutoClose false
+    
+    # Backup existing settings
+    Call BackupSettings
     
     # Initialize log file
     FileOpen $9 "$TEMP\HelloLlama_Install.log" w
@@ -167,6 +216,10 @@ Section "MainSection" SEC01
     # Complete Installation
     DetailPrint "Completing installation..."
     WriteUninstaller "$INSTDIR\uninstall.exe"
+    
+    # Restore settings
+    Call RestoreSettings
+    
     DetailPrint "Installation completed successfully!"
 SectionEnd
 

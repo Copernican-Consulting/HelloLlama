@@ -16,11 +16,8 @@ RequestExecutionLevel admin
 !define MUI_INSTFILESPAGE_PROGRESSBAR "colored"
 
 # Installation steps
-!define STEP_OLLAMA_DOWNLOAD 16
-!define STEP_OLLAMA_INSTALL 33
-!define STEP_MODEL_DOWNLOAD 50
-!define STEP_NODEJS_INSTALL 66
-!define STEP_APP_INSTALL 83
+!define STEP_NODEJS_INSTALL 50
+!define STEP_APP_INSTALL 75
 !define STEP_COMPLETE 100
 
 !insertmacro MUI_PAGE_WELCOME
@@ -100,185 +97,6 @@ Section "MainSection" SEC01
     SendMessage ${HWND_BROADCAST} ${WM_WININICHANGE} 0 "STR:Environment" /TIMEOUT=5000
     Sleep 3000
     
-    # Step 2: Install Ollama
-    DetailPrint "Downloading Ollama..."
-    
-    # Download with error checking
-    ClearErrors
-    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "try { Invoke-WebRequest -Uri https://ollama.ai/download/windows -OutFile $TEMP\ollama-installer.exe; exit 0 } catch { exit 1 }"'
-    Pop $0 # Return value
-    Pop $1 # Output
-    
-    ${If} ${Errors} 
-        MessageBox MB_OK|MB_ICONSTOP "Failed to download Ollama installer. Please check your internet connection."
-        Abort
-    ${EndIf}
-    
-    ${If} $0 != 0
-        MessageBox MB_OK|MB_ICONSTOP "Failed to download Ollama installer (Error code: $0)"
-        Abort
-    ${EndIf}
-    
-    # Verify installer exists and has content
-    IfFileExists "$TEMP\ollama-installer.exe" +3
-        MessageBox MB_OK|MB_ICONSTOP "Ollama installer not found after download"
-        Abort
-    
-    # Check if Ollama is already installed
-    DetailPrint "Checking for existing Ollama installation..."
-    ClearErrors
-    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "try { Get-Service ollama -ErrorAction Stop | Out-Null; exit 0 } catch { exit 1 }"'
-    Pop $0 # Return value
-    Pop $1 # Output
-    
-    ${If} $0 == 0
-        DetailPrint "Ollama is already installed"
-    ${Else}
-        # Install Ollama
-        DetailPrint "Installing Ollama..."
-        ClearErrors
-        
-        # Run installer with explicit admin privileges and wait
-    DetailPrint "Running Ollama installer with admin privileges..."
-    ${LogMessage} "Executing Ollama installer: $TEMP\ollama-installer.exe /S"
-    ExecWait '"$TEMP\ollama-installer.exe" /S' $0
-    ${LogMessage} "Ollama installer exit code: $0"
-        
-    ${If} ${Errors} 
-        ${LogMessage} "Error during Ollama installation"
-        MessageBox MB_OK|MB_ICONSTOP "Error during Ollama installation. Check log file at: $TEMP\HelloLlama_Install.log"
-        Delete "$TEMP\ollama-installer.exe"
-        Abort
-    ${EndIf}
-    
-    ${If} $0 != 0
-        ${LogMessage} "Ollama installation failed with exit code: $0"
-        MessageBox MB_OK|MB_ICONSTOP "Ollama installation failed. Check log file at: $TEMP\HelloLlama_Install.log"
-        Delete "$TEMP\ollama-installer.exe"
-        Abort
-    ${EndIf}
-        
-        Delete "$TEMP\ollama-installer.exe"
-        
-    # Give more time for installation to complete
-    DetailPrint "Waiting for Ollama installation to complete..."
-    ${LogMessage} "Waiting 15 seconds for Ollama installation to complete"
-    Sleep 15000
-    
-    # Log system state
-    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "Get-Service | Where-Object {$_.Name -like ''*ollama*''} | Format-List"'
-    Pop $0
-    Pop $1
-    ${LogMessage} "Service state after installation:$\r$\n$1"
-    ${EndIf}
-    
-    # Verify installation
-    DetailPrint "Verifying Ollama installation..."
-    
-    # Check if Ollama service exists and get its status
-    ${LogMessage} "Checking Ollama service existence"
-    ClearErrors
-    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "Get-Service ollama -ErrorAction Stop | Format-List"'
-    Pop $0 # Return value
-    Pop $1 # Output
-    ${LogMessage} "Service check result:$\r$\n$1"
-    
-    ${If} ${Errors} 
-        ${LogMessage} "Ollama service not found after installation"
-        MessageBox MB_OK|MB_ICONSTOP "Ollama service not found after installation. Check log file at: $TEMP\HelloLlama_Install.log"
-        Abort
-    ${EndIf}
-    
-    # Try to start the service if it's not running
-    DetailPrint "Starting Ollama service..."
-    ${LogMessage} "Attempting to start Ollama service"
-    ClearErrors
-    
-    # Get service status before starting
-    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "Get-Service ollama | Format-List Status, StartType"'
-    Pop $0
-    Pop $1
-    ${LogMessage} "Service status before start:$\r$\n$1"
-    
-    # Try to start the service
-    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "Start-Service ollama -ErrorAction Stop; Get-Service ollama | Format-List Status, StartType; exit 0"'
-    Pop $0 # Return value
-    Pop $1 # Output
-    ${LogMessage} "Start-Service result:$\r$\n$1"
-    
-    ${If} ${Errors} 
-        ${LogMessage} "Failed to start Ollama service with error"
-        MessageBox MB_OK|MB_ICONSTOP "Failed to start Ollama service. Check log file at: $TEMP\HelloLlama_Install.log"
-        Abort
-    ${EndIf}
-    
-    ${If} $0 != 0
-        ${LogMessage} "Failed to start Ollama service with exit code: $0"
-        MessageBox MB_OK|MB_ICONSTOP "Failed to start Ollama service. Check log file at: $TEMP\HelloLlama_Install.log"
-        Abort
-    ${EndIf}
-    
-    # Wait for service to be fully running and verify it's responding
-    DetailPrint "Waiting for Ollama service to start..."
-    ${LogMessage} "Waiting 5 seconds for service to be fully running"
-    Sleep 5000
-    
-    # Check service status after waiting
-    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "Get-Service ollama | Format-List Status, StartType"'
-    Pop $0
-    Pop $1
-    ${LogMessage} "Service status after waiting:$\r$\n$1"
-    
-    # Verify service is responding
-    ClearErrors
-    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "try { Invoke-WebRequest -Uri http://localhost:11434/api/tags -TimeoutSec 30; exit 0 } catch { exit 1 }"'
-    Pop $0 # Return value
-    Pop $1 # Output
-    
-    ${If} ${Errors} 
-        MessageBox MB_OK|MB_ICONSTOP "Ollama service is not responding"
-        Abort
-    ${EndIf}
-    
-    ${If} $0 != 0
-        MessageBox MB_OK|MB_ICONSTOP "Ollama service failed to respond (Error code: $0)"
-        Abort
-    ${EndIf}
-    
-    # Step 3: Download llama3 model
-    DetailPrint "Downloading llama3 model (this may take several minutes)..."
-    ClearErrors
-    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "try { ollama pull llama3:latest; exit 0 } catch { exit 1 }"'
-    Pop $0 # Return value
-    Pop $1 # Output
-    
-    ${If} ${Errors} 
-        MessageBox MB_OK|MB_ICONSTOP "Error downloading llama3 model"
-        Abort
-    ${EndIf}
-    
-    ${If} $0 != 0
-        MessageBox MB_OK|MB_ICONSTOP "Failed to download llama3 model (Error code: $0)"
-        Abort
-    ${EndIf}
-    
-    # Verify model was downloaded
-    DetailPrint "Verifying llama3 model installation..."
-    ClearErrors
-    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "try { Invoke-RestMethod http://localhost:11434/api/tags | ConvertTo-Json | Select-String ''llama3:latest'' | Out-Null; exit 0 } catch { exit 1 }"'
-    Pop $0 # Return value
-    Pop $1 # Output
-    
-    ${If} ${Errors} 
-        MessageBox MB_OK|MB_ICONSTOP "Could not verify llama3 model installation"
-        Abort
-    ${EndIf}
-    
-    ${If} $0 != 0
-        MessageBox MB_OK|MB_ICONSTOP "llama3 model was not found after download"
-        Abort
-    ${EndIf}
-    
     # Step 4: Copy application files
     DetailPrint "Installing Hello Llama application..."
     
@@ -293,11 +111,17 @@ Section "MainSection" SEC01
     File "src\renderer.js"
     File "src\styles.css"
     
+    # Copy Prompts directory with all subdirectories
+    ${LogMessage} "Copying Prompts directory..."
+    SetOutPath "$INSTDIR\resources\app\Prompts"
+    File /r "Prompts\*.*"
+    
     # Create root directory shortcuts and scripts
     SetOutPath "$INSTDIR"
     
-    # Verify package.json exists
+    # Verify required files exist
     IfFileExists "$INSTDIR\resources\app\package.json" 0 InstallError
+    IfFileExists "$INSTDIR\resources\app\Prompts\systemPrompt.txt" 0 InstallError
     Goto FilesExist
     
     InstallError:

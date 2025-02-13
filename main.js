@@ -4,41 +4,8 @@ const isDev = !app.isPackaged;
 const fetch = require('node-fetch');
 const pdfParse = require('pdf-parse');
 const fs = require('fs').promises;
-const { execSync, spawn } = require('child_process');
 const fsSync = require('fs');
 require('@electron/remote/main').initialize();
-
-async function checkOllamaService() {
-    try {
-        await fetch('http://localhost:11434/api/tags');
-        return true;
-    } catch (error) {
-        return false;
-    }
-}
-
-async function ensureOllamaRunning() {
-    const isRunning = await checkOllamaService();
-    if (!isRunning) {
-        console.warn('Ollama service is not running');
-        return false;
-    }
-
-    // Check if llama3 model is available
-    try {
-        const response = await fetch('http://localhost:11434/api/tags');
-        const data = await response.json();
-        const hasLlama3 = data.models.some(model => model.name.startsWith('llama3:'));
-        if (!hasLlama3) {
-            console.warn('llama3 model is not installed');
-            return false;
-        }
-        return true;
-    } catch (error) {
-        console.error('Error checking models:', error);
-        return false;
-    }
-}
 
 function createWindow() {
     const win = new BrowserWindow({
@@ -135,7 +102,6 @@ app.on('window-all-closed', () => {
 app.whenReady().then(async () => {
     await ensurePromptDirectories();
     await ensureUserPrompts();
-    await ensureOllamaRunning(); // Just check, don't quit if not running
     createWindow();
 
     app.on('activate', () => {
@@ -145,79 +111,42 @@ app.whenReady().then(async () => {
     });
 });
 
-
-// Fetch available models from Ollama
-ipcMain.handle('get-models', async () => {
-    try {
-        const response = await fetch('http://localhost:11434/api/tags');
-        const data = await response.json();
-        return data.models.map(model => ({
-            name: model.name,
-            modified_at: model.modified_at
-        }));
-    } catch (error) {
-        console.error('Error fetching models:', error);
-        throw error;
-    }
-});
-
 // Handle opening external URLs
 ipcMain.handle('open-external-url', (event, url) => {
     shell.openExternal(url);
 });
 
-// Handle text processing with either Ollama or OpenRouter
+// Handle text processing with OpenRouter
 ipcMain.handle('process-text', async (event, { text, settings }) => {
     try {
         let response;
         let data;
-
-        if (settings.apiProvider === 'ollama') {
-            response = await fetch('http://localhost:11434/api/generate', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    model: settings.ollamaModel,
-                    prompt: text,
-                    system: settings.systemPrompt,
-                    context_window: settings.contextWindow,
-                    timeout: settings.timeout * 1000,
-                    stream: settings.stream,
-                    temperature: settings.temperature
-                })
-            });
-            data = await response.json();
-            data = data.response;
-        } else {
-            if (!settings.openrouterKey) {
-                throw new Error('No auth credentials found - please enter your OpenRouter API key in Settings');
-            }
-            response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${settings.openrouterKey}`,
-                    'HTTP-Referer': 'http://localhost:3000',
-                    'X-Title': 'Sideview.AI'
-                },
-                body: JSON.stringify({
-                    model: settings.openrouterModel,
-                    messages: [
-                        { role: "system", content: settings.systemPrompt },
-                        { role: "user", content: text }
-                    ],
-                    temperature: settings.temperature,
-                    max_tokens: settings.contextWindow
-                })
-            });
-            const openRouterResponse = await response.json();
-            if (!response.ok) {
-                throw new Error(openRouterResponse.error?.message || 'OpenRouter API error');
-            }
-            data = openRouterResponse.choices[0].message.content;
+        if (!settings.openrouterKey) {
+            throw new Error('No auth credentials found - please enter your OpenRouter API key in Settings');
         }
+        response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${settings.openrouterKey}`,
+                'HTTP-Referer': 'http://localhost:3000',
+                'X-Title': 'Sideview.AI'
+            },
+            body: JSON.stringify({
+                model: settings.openrouterModel,
+                messages: [
+                    { role: "system", content: settings.systemPrompt },
+                    { role: "user", content: text }
+                ],
+                temperature: settings.temperature,
+                max_tokens: settings.contextWindow
+            })
+        });
+        const openRouterResponse = await response.json();
+        if (!response.ok) {
+            throw new Error(openRouterResponse.error?.message || 'OpenRouter API error');
+        }
+        data = openRouterResponse.choices[0].message.content;
         
         // Validate JSON structure
         try {

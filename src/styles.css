@@ -425,6 +425,31 @@ h2 {
     transform: translateX(4px);
 }
 
+/* Basic Feedback View */
+.basic-feedback-view {
+    background: #f9f9f9;
+    padding: 20px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+}
+
+.basic-feedback-header {
+    font-size: 16px;
+    color: #666;
+    margin-bottom: 15px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #ddd;
+}
+
+.basic-feedback-content {
+    white-space: pre-wrap;
+    line-height: 1.6;
+    background: white;
+    padding: 20px;
+    border-radius: 4px;
+    border-left: 4px solid #666;
+}
+
 /* Comment positioning in persona tabs */
 .tab-panel:not(#all) .snippet-comments-content {
     padding-right: 10px;
@@ -656,6 +681,20 @@ h2 {
     align-items: center;
     gap: 8px;
     cursor: pointer;
+}
+
+.filter-options label.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.filter-options input[type="checkbox"]:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.filter-options label.disabled input[type="checkbox"] {
+    cursor: not-allowed;
 }
 
 /* Progress Indicators */

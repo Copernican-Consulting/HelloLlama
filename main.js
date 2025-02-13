@@ -177,27 +177,42 @@ ipcMain.handle('get-models', async () => {
 // Handle text processing with Ollama
 ipcMain.handle('process-text', async (event, { text, settings }) => {
     try {
+        const requestBody = {
+            model: settings.model,
+            prompt: text,
+            system: settings.systemPrompt,
+            context_window: settings.contextWindow,
+            temperature: settings.temperature
+        };
+        console.log('Request body:', requestBody);
+
         const response = await fetch('http://localhost:11434/api/generate', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-                model: settings.model,
-                prompt: text,
-                system: settings.systemPrompt,
-                context_window: settings.contextWindow,
-                timeout: settings.timeout * 1000, // convert to milliseconds
-                stream: settings.stream,
-                temperature: settings.temperature
-            })
+            body: JSON.stringify(requestBody)
         });
 
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
         const data = await response.json();
-        
-        // Validate JSON structure
+        console.log('Raw Ollama response:', data);
+
+        if (!data) {
+            throw new Error('Empty response from model');
+        }
+
+        if (!data.response) {
+            throw new Error('No response field in model output');
+        }
+
+        // Now safe to parse
         try {
             const parsedResponse = JSON.parse(data.response);
+            console.log('Parsed response:', parsedResponse);
             
             // Validate required fields and data types
             if (!parsedResponse.scores || typeof parsedResponse.scores !== 'object') {
